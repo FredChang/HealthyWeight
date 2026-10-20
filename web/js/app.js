@@ -932,34 +932,6 @@ function bindEvents() {
     });
   });
 
-  // 範例預設值按鈕
-  const presets = {
-    'office-f': { gender: 'female', age: 29, height: 160, weight: 62, target: 53, activity: '1.2', method: '168', weeks: 8 },
-    'eatout-m': { gender: 'male', age: 34, height: 174, weight: 82, target: 72, activity: '1.375', method: '168', weeks: 12 },
-    'fitness-u': { gender: 'female', age: 27, height: 168, weight: 68, target: 59, activity: '1.55', method: 'highprotein', weeks: 10 }
-  };
-
-  document.querySelectorAll('.preset-chip[data-preset]').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const p = presets[chip.dataset.preset];
-      if (!p) return;
-      const gRadio = document.querySelector(`input[name="gender"][value="${p.gender}"]`);
-      if (gRadio) gRadio.checked = true;
-      els.inputAge.value = p.age;
-      els.inputHeight.value = p.height;
-      els.inputWeight.value = p.weight;
-      els.inputTargetWeight.value = p.target;
-      els.selectActivity.value = p.activity;
-      els.durationSlider.value = p.weeks;
-      selectedMethodId = p.method;
-      updateLiveBmiBadge();
-      updateDurationLabels();
-      renderMethodCards();
-      renderMethodDetail();
-      runCalculation(false);
-    });
-  });
-
   // AI 拍照與外食分析事件綁定
   els.aiCameraBtn?.addEventListener('click', () => openLiveCamera());
   els.aiSwitchCamBtn?.addEventListener('click', () => switchLiveCamera());
