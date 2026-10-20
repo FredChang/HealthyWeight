@@ -87,8 +87,8 @@ body {
 
 .nav-tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
   background: #e2e8f0;
   padding: 4px;
   border-radius: 10px;
@@ -99,11 +99,12 @@ body {
   background: transparent;
   color: #475569;
   font-weight: 700;
-  font-size: 0.88rem;
-  padding: 9px 6px;
+  font-size: 0.82rem;
+  padding: 9px 4px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .nav-tab.active {
@@ -1427,4 +1428,149 @@ button {
   background: #f5f3ff;
   border-color: #c4b5fd;
   color: #4c1d95;
+}
+
+/* ==================== 🔥 畫面 4：今日打卡看板與體重對比 ==================== */
+.today-hero-card {
+  border: 2px solid #10b981;
+  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 48%);
+}
+
+.today-kcal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@media (min-width: 560px) {
+  .today-kcal-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.today-kcal-box {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 10px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.today-kcal-box.eaten {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.today-kcal-box.remain {
+  border-color: #34d399;
+  background: #ecfdf5;
+}
+
+.today-kcal-box.exercise {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.today-kcal-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.today-kcal-val {
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #0f172a;
+  line-height: 1.15;
+}
+
+.today-kcal-val.highlight {
+  color: #059669;
+}
+
+.today-kcal-val.over-limit {
+  color: #dc2626;
+}
+
+.today-kcal-unit {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.today-progress-wrap {
+  margin-top: 14px;
+}
+
+.today-progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.weight-compare-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+}
+
+.weight-compare-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.compare-num {
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.today-meals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.today-meal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.manual-meal-row {
+  display: grid;
+  grid-template-columns: 1fr 110px auto;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+@media (max-width: 500px) {
+  .manual-meal-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .manual-meal-row button {
+    grid-column: span 2;
+  }
 }

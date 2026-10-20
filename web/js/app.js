@@ -5,7 +5,7 @@ import {
   evaluateMetabolicCalibration,
   getPortionAdjustmentAdvice,
   formatDateShort
-} from './calculator.js?v=1.2.0';
+} from './calculator.js?v=1.3.0';
 import {
   compressImageFile,
   captureVideoFrame,
@@ -14,12 +14,13 @@ import {
   hasCustomApiKey,
   loadAiFoodHistory,
   saveAiFoodHistoryItem
-} from './ai-food.js?v=1.2.0';
-import { APP_VERSION } from './version.js?v=1.2.0';
+} from './ai-food.js?v=1.3.0';
+import { APP_VERSION } from './version.js?v=1.3.0';
 
 const STORAGE_KEYS = {
   PROFILE: 'hw_user_profile_v1',
-  LOGS: 'hw_weight_logs_v1'
+  LOGS: 'hw_weight_logs_v1',
+  TODAY_MAP: 'hw_today_checkin_map_v1'
 };
 
 let dietData = null;
@@ -41,7 +42,8 @@ const screens = {
   setup: document.getElementById('screen-setup'),
   result: document.getElementById('screen-result'),
   meals: document.getElementById('screen-meals'),
-  tracker: document.getElementById('screen-tracker')
+  tracker: document.getElementById('screen-tracker'),
+  history: document.getElementById('screen-history')
 };
 
 const navTabs = Array.from(document.querySelectorAll('.nav-tab'));
@@ -145,15 +147,38 @@ const els = {
   customVeggiesList: document.getElementById('custom-veggies-list'),
   customSelectedTray: document.getElementById('custom-selected-tray'),
   customTrayItems: document.getElementById('custom-tray-items'),
+  customAddToLogBtn: document.getElementById('custom-add-to-log-btn'),
   clearCustomMealBtn: document.getElementById('clear-custom-meal-btn'),
 
-  // Tracker screen & Metabolic Calibration
+  // Screen 4: Today Check-in (今日打卡)
+  todayKcalStatus: document.getElementById('today-kcal-status'),
+  todayEatenKcal: document.getElementById('today-eaten-kcal'),
+  todayRemainingKcal: document.getElementById('today-remaining-kcal'),
+  todayRemainingSub: document.getElementById('today-remaining-sub'),
+  todayExerciseKcal: document.getElementById('today-exercise-kcal'),
+  todayTargetKcal: document.getElementById('today-target-kcal'),
+  todayMacroSummary: document.getElementById('today-macro-summary'),
+  todayProgressPct: document.getElementById('today-progress-pct'),
+  todayKcalBar: document.getElementById('today-kcal-bar'),
+
   logDate: document.getElementById('log-date'),
   logWeight: document.getElementById('log-weight'),
+  weightCompareBadge: document.getElementById('weight-compare-badge'),
+  comparePrevLabel: document.getElementById('compare-prev-label'),
+  comparePrevWeight: document.getElementById('compare-prev-weight'),
+  compareCurrWeight: document.getElementById('compare-curr-weight'),
+  compareDiffVal: document.getElementById('compare-diff-val'),
   logExercise: document.getElementById('log-exercise'),
   logStatus: document.getElementById('log-status'),
   logNote: document.getElementById('log-note'),
   addLogBtn: document.getElementById('add-log-btn'),
+  todayMealsList: document.getElementById('today-meals-list'),
+  goToAiFoodBtn: document.getElementById('go-to-ai-food-btn'),
+  manualMealName: document.getElementById('manual-meal-name'),
+  manualMealKcal: document.getElementById('manual-meal-kcal'),
+  addManualMealBtn: document.getElementById('add-manual-meal-btn'),
+
+  // Screen 5: History & Metabolic Calibration (歷史與校正)
   clearLogsBtn: document.getElementById('clear-logs-btn'),
   trackerStatsSummary: document.getElementById('tracker-stats-summary'),
   trackerLogsList: document.getElementById('tracker-logs-list'),
@@ -166,7 +191,7 @@ const els = {
   calibAutofillBtn: document.getElementById('calib-autofill-btn'),
   calibResetBtn: document.getElementById('calib-reset-btn'),
   calibApplyBtn: document.getElementById('calib-apply-btn'),
-  calibOldTdee: document.getElementById('calib-old-tdee'),
+  calibOldTdee: document.getElementById('calib-formula-tdee') || document.getElementById('calib-old-tdee'),
   calibNewTdee: document.getElementById('calib-new-tdee'),
   calibOffsetVal: document.getElementById('calib-offset-val'),
   calibDiagnosisText: document.getElementById('calib-diagnosis-text'),
@@ -523,9 +548,10 @@ function runCalculation(navigateToResult = false) {
     )
     .join('');
 
-  // 更新套餐頁面資訊與代謝校正預覽
+  // 更新套餐頁面資訊、今日打卡看板與代謝校正預覽
   renderMealPlans();
   updateCustomMealSummary();
+  renderTodayCheckinDashboard();
   updateCalibrationPreview();
 
   if (navigateToResult) {
@@ -571,13 +597,16 @@ function renderMealPlans() {
 
     const mealsHtml = (plan.meals || [])
       .map(
-        (m) => `
+        (m, mIdx) => `
         <div class="meal-slot-box">
           <div class="meal-slot-header">
             <span class="meal-slot-time">${m.slot}</span>
             <span class="meal-slot-kcal">🔥 ${m.calories} kcal · P:${m.protein}g / C:${m.carbs}g / F:${m.fat}g</span>
           </div>
-          <div class="meal-slot-title">${m.title}</div>
+          <div class="meal-slot-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span>${m.title}</span>
+            <button type="button" class="btn-ghost btn-log-single-meal" data-meal-idx="${mIdx}" style="font-size:0.76rem;color:#059669">➕ 單餐打卡</button>
+          </div>
           <ul class="meal-items-ul">
             ${m.items.map((item) => `<li>${item}</li>`).join('')}
           </ul>
@@ -607,7 +636,7 @@ function renderMealPlans() {
           🛒 採買與外食準備清單
         </button>
         <button type="button" class="btn-primary btn-apply-log" data-plan-name="${plan.name}">
-          ✍️ 選用此套餐打卡
+          ✅ 選用此套餐打卡
         </button>
       </div>
     `;
@@ -616,11 +645,30 @@ function renderMealPlans() {
       openShoppingModal(plan);
     });
 
+    card.querySelectorAll('.btn-log-single-meal').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.mealIdx, 10);
+        const m = plan.meals?.[idx];
+        if (!m) return;
+        addMealToTodayCheckin({
+          name: `🍽️ ${m.title}`,
+          kcal: m.calories,
+          p: m.protein,
+          c: m.carbs,
+          f: m.fat
+        });
+        switchTab('tracker');
+      });
+    });
+
     card.querySelector('.btn-apply-log')?.addEventListener('click', () => {
-      els.logNote.value = `執行【${method.shortName}】搭配：${plan.name}`;
-      if (!els.logWeight.value) {
-        els.logWeight.value = els.inputWeight.value;
-      }
+      addMealToTodayCheckin({
+        name: `🍱 【${method.shortName}】${plan.name}`,
+        kcal: plan.baseCalories,
+        p: plan.macros.protein,
+        c: plan.macros.carbs,
+        f: plan.macros.fat
+      });
       switchTab('tracker');
     });
 
@@ -900,7 +948,241 @@ async function runAiFoodAnalysis() {
   }
 }
 
-/* ==================== 每日體重與飲食打卡系統 ==================== */
+/* ==================== 畫面 4：今日打卡（熱量結算、已吃/剩餘/運動、今日體重與昨日比較） ==================== */
+function getTodayIso() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getCurrentCheckinDate() {
+  return els.logDate?.value || getTodayIso();
+}
+
+function loadTodayMap() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.TODAY_MAP);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveTodayMap(map) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.TODAY_MAP, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
+function getCheckinEntryForDate(dateStr) {
+  const map = loadTodayMap();
+  if (!map[dateStr]) {
+    map[dateStr] = {
+      date: dateStr,
+      weight: null,
+      exerciseKcal: 0,
+      status: '✅ 完美達標',
+      note: '',
+      meals: []
+    };
+  }
+  return map[dateStr];
+}
+
+function saveCheckinEntryForDate(dateStr, entry) {
+  const map = loadTodayMap();
+  map[dateStr] = entry;
+  saveTodayMap(map);
+}
+
+function addMealToTodayCheckin({ name, kcal, p = 0, c = 0, f = 0 }) {
+  const dateStr = getCurrentCheckinDate();
+  const entry = getCheckinEntryForDate(dateStr);
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  entry.meals.push({
+    id: `meal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    kcal: Math.round(Number(kcal) || 0),
+    p: Math.round(Number(p) || 0),
+    c: Math.round(Number(c) || 0),
+    f: Math.round(Number(f) || 0),
+    time: timeStr
+  });
+
+  saveCheckinEntryForDate(dateStr, entry);
+  syncCheckinDateToHistoryLogs(dateStr, false);
+  renderTodayCheckinDashboard();
+  renderTrackerLogs();
+}
+
+function getPreviousWeightBaseline(currentDateStr) {
+  const logs = loadLogs();
+  // 尋找日期早於目前打卡日的第一筆歷史紀錄（若同一天有多筆則跳過今天）
+  const prevLog = logs.find((item) => item.date < currentDateStr && item.weight);
+  if (prevLog) {
+    return { weight: Number(prevLog.weight), label: `昨日／前次 (${prevLog.date})` };
+  }
+  const otherLog = logs.find((item) => item.date !== currentDateStr && item.weight);
+  if (otherLog) {
+    return { weight: Number(otherLog.weight), label: `前次紀錄 (${otherLog.date})` };
+  }
+  const initW = parseFloat(els.inputWeight?.value) || 64.0;
+  return { weight: initW, label: '初始設定體重' };
+}
+
+function updateWeightComparisonUI() {
+  if (!els.comparePrevWeight) return;
+  const dateStr = getCurrentCheckinDate();
+  const prev = getPreviousWeightBaseline(dateStr);
+  const rawCurr = parseFloat(els.logWeight?.value);
+  const currW = !isNaN(rawCurr) && rawCurr >= 30 ? rawCurr : prev.weight;
+  const diff = +(currW - prev.weight).toFixed(1);
+
+  if (els.comparePrevLabel) els.comparePrevLabel.textContent = prev.label;
+  els.comparePrevWeight.textContent = `${prev.weight.toFixed(1)} kg`;
+  els.compareCurrWeight.textContent = `${currW.toFixed(1)} kg`;
+
+  if (diff < 0) {
+    els.compareDiffVal.textContent = `📉 ${diff.toFixed(1)} kg (比昨日下降！)`;
+    els.compareDiffVal.style.color = '#059669';
+    if (els.weightCompareBadge) {
+      els.weightCompareBadge.textContent = `📉 比前次瘦 ${Math.abs(diff).toFixed(1)} kg`;
+      els.weightCompareBadge.style.color = '#059669';
+    }
+  } else if (diff > 0) {
+    els.compareDiffVal.textContent = `📈 +${diff.toFixed(1)} kg (比昨日微升)`;
+    els.compareDiffVal.style.color = '#d97706';
+    if (els.weightCompareBadge) {
+      els.weightCompareBadge.textContent = `📈 比前次 +${diff.toFixed(1)} kg`;
+      els.weightCompareBadge.style.color = '#d97706';
+    }
+  } else {
+    els.compareDiffVal.textContent = '➖ 持平 0.0 kg';
+    els.compareDiffVal.style.color = '#475569';
+    if (els.weightCompareBadge) {
+      els.weightCompareBadge.textContent = '⚖️ 與前次持平';
+      els.weightCompareBadge.style.color = '#475569';
+    }
+  }
+}
+
+function renderTodayCheckinDashboard() {
+  if (!els.todayEatenKcal) return;
+  const dateStr = getCurrentCheckinDate();
+  const entry = getCheckinEntryForDate(dateStr);
+
+  const targetKcal = lastCalculation?.calc?.targetCalories || 1380;
+  const exerciseKcal = Math.max(0, Number(entry.exerciseKcal) || 0);
+  const totals = (entry.meals || []).reduce(
+    (acc, m) => {
+      acc.kcal += Number(m.kcal) || 0;
+      acc.p += Number(m.p) || 0;
+      acc.c += Number(m.c) || 0;
+      acc.f += Number(m.f) || 0;
+      return acc;
+    },
+    { kcal: 0, p: 0, c: 0, f: 0 }
+  );
+
+  const eatenKcal = Math.round(totals.kcal);
+  const totalBudget = targetKcal + exerciseKcal;
+  const remainingKcal = totalBudget - eatenKcal;
+
+  els.todayEatenKcal.textContent = eatenKcal.toLocaleString();
+  els.todayExerciseKcal.textContent = `+${exerciseKcal.toLocaleString()}`;
+  els.todayTargetKcal.textContent = targetKcal.toLocaleString();
+
+  if (remainingKcal >= 0) {
+    els.todayRemainingKcal.textContent = remainingKcal.toLocaleString();
+    els.todayRemainingKcal.classList.add('highlight');
+    els.todayRemainingKcal.classList.remove('over-limit');
+    if (els.todayRemainingSub) els.todayRemainingSub.textContent = 'kcal (今日還可攝取)';
+    if (els.todayKcalStatus) {
+      els.todayKcalStatus.textContent =
+        eatenKcal === 0 ? '🍽️ 尚未記錄今日飲食' : `🟢 還可攝取 ${remainingKcal} kcal`;
+      els.todayKcalStatus.style.color = '#047857';
+    }
+  } else {
+    els.todayRemainingKcal.textContent = `超標 ${Math.abs(remainingKcal).toLocaleString()}`;
+    els.todayRemainingKcal.classList.remove('highlight');
+    els.todayRemainingKcal.classList.add('over-limit');
+    if (els.todayRemainingSub) els.todayRemainingSub.textContent = 'kcal (建議多走動消耗)';
+    if (els.todayKcalStatus) {
+      els.todayKcalStatus.textContent = `🔴 已超標 ${Math.abs(remainingKcal)} kcal`;
+      els.todayKcalStatus.style.color = '#dc2626';
+    }
+  }
+
+  const pct = totalBudget > 0 ? Math.min(100, Math.round((eatenKcal / totalBudget) * 100)) : 0;
+  if (els.todayMacroSummary) {
+    els.todayMacroSummary.textContent = `今日累計營養素：蛋白質 ${Math.round(totals.p)}g · 碳水 ${Math.round(totals.c)}g · 脂肪 ${Math.round(totals.f)}g`;
+  }
+  if (els.todayProgressPct) {
+    els.todayProgressPct.textContent = `已吃 ${eatenKcal} / 可吃配額 ${totalBudget} kcal (${pct}%)`;
+  }
+  if (els.todayKcalBar) {
+    els.todayKcalBar.style.width = `${pct}%`;
+    els.todayKcalBar.style.background = remainingKcal >= 0 ? '#10b981' : '#ef4444';
+  }
+
+  // 同步運動輸入框與體重欄位
+  if (els.logExercise && document.activeElement !== els.logExercise) {
+    els.logExercise.value = String(exerciseKcal);
+  }
+  if (els.logWeight && document.activeElement !== els.logWeight) {
+    if (entry.weight) {
+      els.logWeight.value = entry.weight;
+    } else if (!els.logWeight.value) {
+      els.logWeight.value = els.inputWeight?.value || '64.0';
+    }
+  }
+  if (els.logStatus && entry.status) els.logStatus.value = entry.status;
+  if (els.logNote && document.activeElement !== els.logNote) {
+    els.logNote.value = entry.note || '';
+  }
+
+  updateWeightComparisonUI();
+
+  // 渲染今日已打卡飲食明細
+  if (els.todayMealsList) {
+    if (!entry.meals || entry.meals.length === 0) {
+      els.todayMealsList.innerHTML = `<div class="pool-text" style="padding:10px 4px">今日尚無飲食打卡。您可以到「3. 飲食套餐」拍餐點照片或點選套餐按「打卡」，或由下方手動補登！</div>`;
+    } else {
+      els.todayMealsList.innerHTML = '';
+      entry.meals.forEach((m, idx) => {
+        const row = document.createElement('div');
+        row.className = 'today-meal-row';
+        row.innerHTML = `
+          <div>
+            <strong>${m.name}</strong>
+            <span class="pool-text" style="margin-left:6px">${m.time || ''}</span>
+            <div class="pool-text" style="font-size:0.76rem;margin-top:2px">P:${m.p || 0}g · C:${m.c || 0}g · F:${m.f || 0}g</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;white-space:nowrap">
+            <strong style="color:#059669">${m.kcal} kcal</strong>
+            <button type="button" class="btn-ghost" data-del-meal="${idx}" style="padding:4px 8px;font-size:0.78rem">移除</button>
+          </div>
+        `;
+        row.querySelector('[data-del-meal]')?.addEventListener('click', () => {
+          entry.meals.splice(idx, 1);
+          saveCheckinEntryForDate(dateStr, entry);
+          syncCheckinDateToHistoryLogs(dateStr, false);
+          renderTodayCheckinDashboard();
+          renderTrackerLogs();
+        });
+        els.todayMealsList.appendChild(row);
+      });
+    }
+  }
+}
+
+/* ==================== 畫面 5：歷史打卡紀錄與實測代謝能力動態校正 ==================== */
 function loadLogs() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LOGS);
@@ -918,12 +1200,64 @@ function saveLogs(logs) {
   }
 }
 
+function syncCheckinDateToHistoryLogs(dateStr, requireValidWeight = false) {
+  const entry = getCheckinEntryForDate(dateStr);
+  const rawWeight = parseFloat(els.logWeight?.value || entry.weight || els.inputWeight?.value);
+  if (requireValidWeight && (isNaN(rawWeight) || rawWeight < 30 || rawWeight > 250)) {
+    alert('請輸入有效的今日體重數值 (kg)');
+    return false;
+  }
+
+  const weight = !isNaN(rawWeight) && rawWeight >= 30 ? +rawWeight.toFixed(1) : +(parseFloat(els.inputWeight?.value) || 64.0).toFixed(1);
+  const exerciseKcal = Math.max(0, parseInt(els.logExercise?.value ?? entry.exerciseKcal, 10) || 0);
+  const status = els.logStatus?.value || entry.status || '✅ 完美達標';
+  const note = els.logNote?.value.trim() ?? entry.note ?? '';
+
+  entry.weight = weight;
+  entry.exerciseKcal = exerciseKcal;
+  entry.status = status;
+  entry.note = note;
+  saveCheckinEntryForDate(dateStr, entry);
+
+  const eatenKcal = Math.round((entry.meals || []).reduce((s, m) => s + (Number(m.kcal) || 0), 0));
+  const targetKcal = lastCalculation?.calc?.targetCalories || 1380;
+  const remainingKcal = targetKcal + exerciseKcal - eatenKcal;
+  const mealNames = (entry.meals || []).map((m) => `${m.name}(${m.kcal}卡)`).join('、');
+
+  const prev = getPreviousWeightBaseline(dateStr);
+  const weightDiff = +(weight - prev.weight).toFixed(1);
+
+  const logs = loadLogs();
+  const existingIdx = logs.findIndex((item) => item.date === dateStr);
+  const logRecord = {
+    date: dateStr,
+    weight,
+    weightDiff,
+    eatenKcal,
+    exerciseKcal,
+    remainingKcal,
+    mealsSummary: mealNames,
+    status,
+    note
+  };
+
+  if (existingIdx >= 0) {
+    logs[existingIdx] = logRecord;
+  } else {
+    logs.unshift(logRecord);
+    logs.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  }
+  saveLogs(logs);
+  return true;
+}
+
 function renderTrackerLogs() {
+  if (!els.trackerLogsList) return;
   const logs = loadLogs();
   els.trackerLogsList.innerHTML = '';
 
   if (logs.length === 0) {
-    els.trackerStatsSummary.innerHTML = `<span class="pool-text">尚無打卡紀錄。現在就輸入今日體重與運動消耗開始第一筆紀錄吧！</span>`;
+    els.trackerStatsSummary.innerHTML = `<span class="pool-text">尚無歷史打卡紀錄。請在「4. 今日打卡」記錄您的飲食、運動或今日體重！</span>`;
     return;
   }
 
@@ -937,20 +1271,34 @@ function renderTrackerLogs() {
   els.trackerStatsSummary.innerHTML = `
     <span class="status-badge">累計打卡：${logs.length} 天</span>
     <span class="status-badge">最新體重：${latest.weight} kg</span>
-    <span class="status-badge">期間變化：${diffText}</span>
-    <span class="status-badge">累計運動消耗：🔥 ${totalExercise} kcal (日均 ${avgExercise} kcal)</span>
+    <span class="status-badge">總體重變化：${diffText}</span>
+    <span class="status-badge">期間運動消耗：🔥 ${totalExercise} kcal (日均 ${avgExercise} kcal)</span>
   `;
 
   logs.forEach((item, idx) => {
     const exKcal = Number(item.exerciseKcal) || 0;
+    const eatenKcal = Number(item.eatenKcal) || 0;
+    const wDiff = typeof item.weightDiff === 'number' ? item.weightDiff : null;
+    const wDiffBadge =
+      wDiff !== null
+        ? `<span class="plan-tag" style="margin-left:6px;background:${wDiff <= 0 ? '#dcfce7' : '#fef3c7'};color:${wDiff <= 0 ? '#166534' : '#92400e'}">${wDiff <= 0 ? `📉 ${wDiff}kg` : `📈 +${wDiff}kg`}</span>`
+        : '';
+
     const row = document.createElement('div');
     row.className = 'tracker-log-item';
     row.innerHTML = `
       <div>
-        <strong>${item.date}</strong> · <span class="highlight-num">${item.weight} kg</span>
-        <span class="plan-tag" style="margin-left:6px">${item.status}</span>
-        ${exKcal > 0 ? `<span class="plan-tag" style="margin-left:6px;background:#fef3c7;color:#92400e">🏃 運動 -${exKcal} kcal</span>` : ''}
-        ${item.note ? `<div class="pool-text" style="margin-top:4px">${item.note}</div>` : ''}
+        <div>
+          <strong>${item.date}</strong> · <span class="highlight-num">${item.weight} kg</span>
+          ${wDiffBadge}
+          <span class="plan-tag" style="margin-left:6px">${item.status}</span>
+        </div>
+        <div style="margin-top:4px;font-size:0.82rem;color:#334155">
+          🍽️ 已吃 <strong>${eatenKcal} kcal</strong> · 🏃 運動消耗 <strong>${exKcal} kcal</strong>
+          ${typeof item.remainingKcal === 'number' ? ` · ✨ 剩餘配額 <strong>${item.remainingKcal} kcal</strong>` : ''}
+        </div>
+        ${item.mealsSummary ? `<div class="pool-text" style="margin-top:3px">🍱 飲食明細：${item.mealsSummary}</div>` : ''}
+        ${item.note ? `<div class="pool-text" style="margin-top:2px">📝 備註：${item.note}</div>` : ''}
       </div>
       <button type="button" class="btn-ghost" data-del-idx="${idx}">刪除</button>
     `;
@@ -959,6 +1307,7 @@ function renderTrackerLogs() {
       updated.splice(idx, 1);
       saveLogs(updated);
       renderTrackerLogs();
+      updateWeightComparisonUI();
     });
     els.trackerLogsList.appendChild(row);
   });
@@ -1016,7 +1365,7 @@ function updateCalibrationPreview() {
 function autofillCalibrationFromLogs() {
   const logs = loadLogs();
   if (logs.length === 0) {
-    alert('目前尚無打卡紀錄！您可直接手動輸入上方欄位（例如：執行 7 天、預計 -1.0 kg、實際 +0.5 kg），或先新增體重打卡。');
+    alert('目前尚無歷史打卡紀錄！您可直接手動輸入上方欄位（例如：執行 7 天、預計 -1.0 kg、實際 +0.5 kg），或先在「4. 今日打卡」儲存體重。');
     return;
   }
 
@@ -1055,6 +1404,10 @@ function bindEvents() {
         runCalculation(false);
       }
       if (tab === 'tracker') {
+        renderTodayCheckinDashboard();
+      }
+      if (tab === 'history') {
+        renderTrackerLogs();
         updateCalibrationPreview();
       }
       switchTab(tab);
@@ -1115,12 +1468,42 @@ function bindEvents() {
     els.customSelectedTray?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 
+  // 拍完餐點或文字分析後按「✅ 打卡記錄這餐熱量」-> 自動寫入今日已吃熱量並切換到「4. 今日打卡」
   els.aiAddToLogBtn?.addEventListener('click', () => {
     if (!lastAiAnalysis) return;
-    els.logNote.value = `📸 AI 外食分析：${lastAiAnalysis.mealName} (${lastAiAnalysis.totalCalories} kcal · P:${lastAiAnalysis.proteinGrams}g C:${lastAiAnalysis.carbsGrams}g F:${lastAiAnalysis.fatGrams}g)`;
-    if (!els.logWeight.value) {
-      els.logWeight.value = els.inputWeight.value;
-    }
+    addMealToTodayCheckin({
+      name: `📸 ${lastAiAnalysis.mealName}`,
+      kcal: lastAiAnalysis.totalCalories,
+      p: lastAiAnalysis.proteinGrams,
+      c: lastAiAnalysis.carbsGrams,
+      f: lastAiAnalysis.fatGrams
+    });
+    switchTab('tracker');
+  });
+
+  // 自訂自由混搭餐盤按「✅ 將此混搭餐盤打卡至今日已吃熱量」
+  els.customAddToLogBtn?.addEventListener('click', () => {
+    if (customTray.length === 0) return;
+    const totals = customTray.reduce(
+      (acc, item) => {
+        acc.kcal += item.kcal;
+        acc.p += item.p;
+        acc.c += item.c;
+        acc.f += item.f;
+        return acc;
+      },
+      { kcal: 0, p: 0, c: 0, f: 0 }
+    );
+    const names = customTray.map((i) => i.name).join('＋');
+    addMealToTodayCheckin({
+      name: `🥗 自選混搭：${names}`,
+      kcal: totals.kcal,
+      p: totals.p,
+      c: totals.c,
+      f: totals.f
+    });
+    customTray = [];
+    updateCustomMealSummary();
     switchTab('tracker');
   });
 
@@ -1170,6 +1553,7 @@ function bindEvents() {
   document.getElementById('edit-profile-btn')?.addEventListener('click', () => switchTab('setup'));
   document.getElementById('back-to-setup-btn')?.addEventListener('click', () => switchTab('setup'));
   document.getElementById('go-to-meals-btn')?.addEventListener('click', () => switchTab('meals'));
+  els.goToAiFoodBtn?.addEventListener('click', () => switchTab('meals'));
 
   // 套餐分類篩選
   els.mealCategoryFilters?.querySelectorAll('.cat-chip').forEach((chip) => {
@@ -1213,50 +1597,85 @@ function bindEvents() {
     }
   });
 
-  // 體重打卡與運動消耗快速按鈕
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // ==================== 畫面 4：今日打卡事件綁定 ====================
+  const todayIso = getTodayIso();
   if (els.logDate) els.logDate.value = todayIso;
 
+  els.logDate?.addEventListener('change', () => {
+    renderTodayCheckinDashboard();
+  });
+
+  els.logWeight?.addEventListener('input', () => {
+    const dateStr = getCurrentCheckinDate();
+    const entry = getCheckinEntryForDate(dateStr);
+    const val = parseFloat(els.logWeight.value);
+    if (!isNaN(val) && val >= 30) {
+      entry.weight = +val.toFixed(1);
+      saveCheckinEntryForDate(dateStr, entry);
+    }
+    updateWeightComparisonUI();
+  });
+
+  // 手動補登一筆今日飲食
+  els.addManualMealBtn?.addEventListener('click', () => {
+    const name = els.manualMealName?.value.trim() || '手動補登餐點';
+    const kcal = parseInt(els.manualMealKcal?.value, 10);
+    if (isNaN(kcal) || kcal <= 0) {
+      alert('請輸入有效的食物熱量 (kcal)');
+      return;
+    }
+    addMealToTodayCheckin({ name: `🍽️ ${name}`, kcal });
+    if (els.manualMealName) els.manualMealName.value = '';
+    if (els.manualMealKcal) els.manualMealKcal.value = '';
+  });
+
+  // 運動消耗快速累加按鈕與輸入框
   document.querySelectorAll('.ex-quick-btn').forEach((chip) => {
     chip.addEventListener('click', () => {
       if (!els.logExercise) return;
+      const dateStr = getCurrentCheckinDate();
+      const entry = getCheckinEntryForDate(dateStr);
       const addKcal = parseInt(chip.dataset.kcal, 10) || 0;
-      if (addKcal === 0) {
-        els.logExercise.value = '0';
-      } else {
-        const cur = parseInt(els.logExercise.value, 10) || 0;
-        els.logExercise.value = String(cur + addKcal);
-      }
+      const nextVal = addKcal === 0 ? 0 : (parseInt(els.logExercise.value, 10) || 0) + addKcal;
+      els.logExercise.value = String(nextVal);
+      entry.exerciseKcal = nextVal;
+      saveCheckinEntryForDate(dateStr, entry);
+      syncCheckinDateToHistoryLogs(dateStr, false);
+      renderTodayCheckinDashboard();
+      renderTrackerLogs();
     });
   });
 
-  els.addLogBtn?.addEventListener('click', () => {
-    const date = els.logDate.value || todayIso;
-    const weight = parseFloat(els.logWeight.value || els.inputWeight.value);
-    if (isNaN(weight) || weight < 30 || weight > 250) {
-      alert('請輸入有效的體重數值 (kg)');
-      return;
-    }
-    const exerciseKcal = Math.max(0, parseInt(els.logExercise?.value, 10) || 0);
-    const status = els.logStatus.value;
-    const note = els.logNote.value.trim();
+  els.logExercise?.addEventListener('input', () => {
+    const dateStr = getCurrentCheckinDate();
+    const entry = getCheckinEntryForDate(dateStr);
+    entry.exerciseKcal = Math.max(0, parseInt(els.logExercise.value, 10) || 0);
+    saveCheckinEntryForDate(dateStr, entry);
+    renderTodayCheckinDashboard();
+  });
 
-    const logs = loadLogs();
-    logs.unshift({ date, weight: +weight.toFixed(1), exerciseKcal, status, note });
-    saveLogs(logs);
-    els.logNote.value = '';
-    if (els.logExercise) els.logExercise.value = '0';
+  els.addLogBtn?.addEventListener('click', () => {
+    const dateStr = getCurrentCheckinDate();
+    const ok = syncCheckinDateToHistoryLogs(dateStr, true);
+    if (!ok) return;
+    renderTodayCheckinDashboard();
     renderTrackerLogs();
+    const origText = els.addLogBtn.textContent;
+    els.addLogBtn.textContent = '✅ 已成功儲存今日打卡結算！';
+    setTimeout(() => {
+      els.addLogBtn.textContent = origText;
+    }, 1800);
   });
 
   els.clearLogsBtn?.addEventListener('click', () => {
     if (confirm('確定要清除所有歷史打卡紀錄嗎？')) {
       saveLogs([]);
       renderTrackerLogs();
+      updateWeightComparisonUI();
     }
   });
 
-  // 實測代謝能力動態校正 (Adaptive TDEE) 事件綁定
+  // ==================== 畫面 5：實測代謝能力動態校正 (Adaptive TDEE) ====================
   [els.calibDays, els.calibAvgExercise, els.calibExpectedKg, els.calibActualKg].forEach((input) => {
     input?.addEventListener('input', () => {
       updateCalibrationPreview();
@@ -1329,7 +1748,7 @@ async function init() {
       }
     });
     navigator.serviceWorker
-      .register('./sw.js?v=1.2.0', { updateViaCache: 'none' })
+      .register('./sw.js?v=1.3.0', { updateViaCache: 'none' })
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
   }
@@ -1338,6 +1757,7 @@ async function init() {
   updateLiveBmiBadge();
   updateDurationLabels();
   bindEvents();
+  renderTodayCheckinDashboard();
   renderTrackerLogs();
   renderAiHistoryList();
 
@@ -1348,9 +1768,7 @@ async function init() {
     renderMethodDetail();
     initCustomMealBuilder();
     runCalculation(false);
-    if (els.logWeight && !els.logWeight.value) {
-      els.logWeight.value = els.inputWeight.value;
-    }
+    renderTodayCheckinDashboard();
   } catch (err) {
     console.error(err);
   } finally {
