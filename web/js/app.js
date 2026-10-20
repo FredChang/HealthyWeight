@@ -5,6 +5,14 @@ import {
   getPortionAdjustmentAdvice,
   formatDateShort
 } from './calculator.js';
+import {
+  compressImageFile,
+  analyzeFoodWithAi,
+  setCustomApiKey,
+  hasCustomApiKey,
+  loadAiFoodHistory,
+  saveAiFoodHistoryItem
+} from './ai-food.js';
 import { APP_VERSION } from './version.js';
 
 const STORAGE_KEYS = {
@@ -20,6 +28,8 @@ let highlightedPlanId = null;
 let lastCalculation = null;
 let customTray = [];
 let currentModalShoppingText = '';
+let currentAiImage = null;
+let lastAiAnalysis = null;
 
 const screens = {
   setup: document.getElementById('screen-setup'),
@@ -78,7 +88,37 @@ const els = {
   weightChartContainer: document.getElementById('weight-chart-container'),
   milestoneTbody: document.getElementById('milestone-tbody'),
 
-  // Meals screen
+  // Meals screen & AI analyzer
+  aiCameraInput: document.getElementById('ai-camera-input'),
+  aiGalleryInput: document.getElementById('ai-gallery-input'),
+  aiCameraBtn: document.getElementById('ai-camera-btn'),
+  aiGalleryBtn: document.getElementById('ai-gallery-btn'),
+  aiImagePreviewWrap: document.getElementById('ai-image-preview-wrap'),
+  aiImagePreview: document.getElementById('ai-image-preview'),
+  aiRemoveImageBtn: document.getElementById('ai-remove-image-btn'),
+  aiFoodNote: document.getElementById('ai-food-note'),
+  aiAnalyzeBtn: document.getElementById('ai-analyze-btn'),
+  aiLoadingBox: document.getElementById('ai-loading-box'),
+  aiLoadingText: document.getElementById('ai-loading-text'),
+  aiErrorBox: document.getElementById('ai-error-box'),
+  aiResultPanel: document.getElementById('ai-result-panel'),
+  aiResFit: document.getElementById('ai-res-fit'),
+  aiResTitle: document.getElementById('ai-res-title'),
+  aiResKcal: document.getElementById('ai-res-kcal'),
+  aiResPct: document.getElementById('ai-res-pct'),
+  aiResP: document.getElementById('ai-res-p'),
+  aiResC: document.getElementById('ai-res-c'),
+  aiResF: document.getElementById('ai-res-f'),
+  aiResItems: document.getElementById('ai-res-items'),
+  aiResCoachTip: document.getElementById('ai-res-coach-tip'),
+  aiResNextMeal: document.getElementById('ai-res-next-meal'),
+  aiAddToTrayBtn: document.getElementById('ai-add-to-tray-btn'),
+  aiAddToLogBtn: document.getElementById('ai-add-to-log-btn'),
+  aiApiKeyInput: document.getElementById('ai-api-key-input'),
+  aiSaveKeyBtn: document.getElementById('ai-save-key-btn'),
+  aiKeyStatus: document.getElementById('ai-key-status'),
+  aiHistoryList: document.getElementById('ai-history-list'),
+
   mealTargetSummary: document.getElementById('meal-target-summary'),
   mealCategoryFilters: document.getElementById('meal-category-filters'),
   mealPlansList: document.getElementById('meal-plans-list'),
@@ -625,6 +665,134 @@ function updateCustomMealSummary() {
   }
 }
 
+/* ==================== 📸 AI 拍照算卡路里與外食分析 ==================== */
+async function handleAiImageSelect(file) {
+  if (!file) return;
+  els.aiErrorBox?.classList.add('hidden');
+  try {
+    const compressed = await compressImageFile(file);
+    currentAiImage = compressed;
+    if (els.aiImagePreview) {
+      els.aiImagePreview.src = compressed.dataUrl;
+    }
+    els.aiImagePreviewWrap?.classList.remove('hidden');
+  } catch (err) {
+    if (els.aiErrorBox) {
+      els.aiErrorBox.textContent = `⚠️ 讀取照片失敗：${err.message}`;
+      els.aiErrorBox.classList.remove('hidden');
+    }
+  }
+}
+
+function renderAiAnalysisResult(analysis) {
+  if (!analysis) return;
+  lastAiAnalysis = analysis;
+
+  const targetKcal = lastCalculation?.calc?.targetCalories || 1400;
+  const pct = Math.round((analysis.totalCalories / targetKcal) * 100);
+
+  els.aiResFit.textContent = analysis.fitScore || '🟡 需微調份量';
+  els.aiResTitle.textContent = analysis.mealName;
+  els.aiResKcal.textContent = `約 ${analysis.totalCalories} kcal`;
+  els.aiResPct.textContent = `佔今日目標 (${targetKcal} kcal) 的 ${pct}%`;
+  els.aiResP.textContent = `${analysis.proteinGrams} g`;
+  els.aiResC.textContent = `${analysis.carbsGrams} g`;
+  els.aiResF.textContent = `${analysis.fatGrams} g`;
+
+  els.aiResItems.innerHTML = (analysis.items || [])
+    .map(
+      (item) => `
+      <div class="ai-item-row">
+        <div>
+          <strong>${item.name}</strong>
+          <span class="pool-text">（${item.portion}）</span>
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <strong style="color:#059669">${item.calories} kcal</strong>
+          <div class="pool-text" style="font-size:0.74rem">P:${item.p}g C:${item.c}g F:${item.f}g</div>
+        </div>
+      </div>
+    `
+    )
+    .join('');
+
+  els.aiResCoachTip.textContent = analysis.coachTip || '細嚼慢嚥，先吃蔬菜與蛋白質再吃澱粉。';
+  els.aiResNextMeal.textContent = analysis.nextMealAdvice || '下一餐請以低脂高蛋白與蔬菜為主。';
+  els.aiResultPanel?.classList.remove('hidden');
+}
+
+function renderAiHistoryList() {
+  if (!els.aiHistoryList) return;
+  const list = loadAiFoodHistory();
+  if (list.length === 0) {
+    els.aiHistoryList.innerHTML = `<span class="pool-text">尚無外食分析紀錄。</span>`;
+    return;
+  }
+
+  els.aiHistoryList.innerHTML = '';
+  list.forEach((entry) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ai-history-btn';
+    btn.innerHTML = `
+      <div>
+        <strong>${entry.mealName}</strong>
+        <span class="pool-text" style="margin-left:6px">${entry.timestamp}</span>
+      </div>
+      <strong style="color:#059669">${entry.totalCalories} kcal (P:${entry.proteinGrams}g)</strong>
+    `;
+    btn.addEventListener('click', () => {
+      renderAiAnalysisResult(entry);
+      els.aiResultPanel?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    els.aiHistoryList.appendChild(btn);
+  });
+}
+
+async function runAiFoodAnalysis() {
+  const userNote = els.aiFoodNote?.value.trim() || '';
+  if (!currentAiImage && !userNote) {
+    if (els.aiErrorBox) {
+      els.aiErrorBox.textContent = '📸 請先「拍照／選取餐點照片」，或在文字框輸入外食菜色（例如：排骨便當飯吃一半）！';
+      els.aiErrorBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  els.aiErrorBox?.classList.add('hidden');
+  els.aiLoadingBox?.classList.remove('hidden');
+  if (els.aiAnalyzeBtn) els.aiAnalyzeBtn.disabled = true;
+
+  try {
+    const method = getCurrentMethod();
+    const targetCalories = lastCalculation?.calc?.targetCalories || 1400;
+    const proteinGrams = lastCalculation?.calc?.macros?.proteinGrams || 105;
+
+    const { result } = await analyzeFoodWithAi({
+      imageBase64: currentAiImage?.base64Data || null,
+      mimeType: currentAiImage?.mimeType || 'image/jpeg',
+      userNote,
+      dietContext: {
+        methodName: method?.name || '168 間歇性斷食',
+        targetCalories,
+        proteinGrams
+      }
+    });
+
+    renderAiAnalysisResult(result);
+    saveAiFoodHistoryItem(result);
+    renderAiHistoryList();
+  } catch (err) {
+    if (els.aiErrorBox) {
+      els.aiErrorBox.textContent = `⚠️ AI 分析失敗：${err.message}`;
+      els.aiErrorBox.classList.remove('hidden');
+    }
+  } finally {
+    els.aiLoadingBox?.classList.add('hidden');
+    if (els.aiAnalyzeBtn) els.aiAnalyzeBtn.disabled = false;
+  }
+}
+
 /* ==================== 每日體重與飲食打卡系統 ==================== */
 function loadLogs() {
   try {
@@ -703,7 +871,7 @@ function bindEvents() {
     'fitness-u': { gender: 'female', age: 27, height: 168, weight: 68, target: 59, activity: '1.55', method: 'highprotein', weeks: 10 }
   };
 
-  document.querySelectorAll('.preset-chip').forEach((chip) => {
+  document.querySelectorAll('.preset-chip[data-preset]').forEach((chip) => {
     chip.addEventListener('click', () => {
       const p = presets[chip.dataset.preset];
       if (!p) return;
@@ -722,6 +890,74 @@ function bindEvents() {
       renderMethodDetail();
       runCalculation(false);
     });
+  });
+
+  // AI 拍照與外食分析事件綁定
+  els.aiCameraBtn?.addEventListener('click', () => els.aiCameraInput?.click());
+  els.aiGalleryBtn?.addEventListener('click', () => els.aiGalleryInput?.click());
+
+  els.aiCameraInput?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleAiImageSelect(file);
+  });
+
+  els.aiGalleryInput?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleAiImageSelect(file);
+  });
+
+  els.aiRemoveImageBtn?.addEventListener('click', () => {
+    currentAiImage = null;
+    if (els.aiCameraInput) els.aiCameraInput.value = '';
+    if (els.aiGalleryInput) els.aiGalleryInput.value = '';
+    els.aiImagePreviewWrap?.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.ai-quick-note').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      if (els.aiFoodNote) {
+        els.aiFoodNote.value = chip.dataset.note || '';
+      }
+      runAiFoodAnalysis();
+    });
+  });
+
+  els.aiAnalyzeBtn?.addEventListener('click', () => {
+    runAiFoodAnalysis();
+  });
+
+  els.aiAddToTrayBtn?.addEventListener('click', () => {
+    if (!lastAiAnalysis) return;
+    customTray.push({
+      id: `ai-${Date.now()}`,
+      name: `📸 ${lastAiAnalysis.mealName}`,
+      kcal: lastAiAnalysis.totalCalories,
+      p: lastAiAnalysis.proteinGrams,
+      c: lastAiAnalysis.carbsGrams,
+      f: lastAiAnalysis.fatGrams
+    });
+    updateCustomMealSummary();
+    els.customSelectedTray?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  els.aiAddToLogBtn?.addEventListener('click', () => {
+    if (!lastAiAnalysis) return;
+    els.logNote.value = `📸 AI 外食分析：${lastAiAnalysis.mealName} (${lastAiAnalysis.totalCalories} kcal · P:${lastAiAnalysis.proteinGrams}g C:${lastAiAnalysis.carbsGrams}g F:${lastAiAnalysis.fatGrams}g)`;
+    if (!els.logWeight.value) {
+      els.logWeight.value = els.inputWeight.value;
+    }
+    switchTab('tracker');
+  });
+
+  els.aiSaveKeyBtn?.addEventListener('click', () => {
+    const keyVal = els.aiApiKeyInput?.value.trim() || '';
+    setCustomApiKey(keyVal);
+    if (els.aiKeyStatus) {
+      els.aiKeyStatus.textContent = hasCustomApiKey()
+        ? '✅ 已儲存並啟用您自訂的 Gemini API Key！'
+        : '✅ 已恢復使用系統內建預設 API Key！';
+    }
+    if (els.aiApiKeyInput) els.aiApiKeyInput.value = '';
   });
 
   // 即時更新 BMI 與計算
@@ -860,6 +1096,7 @@ async function init() {
   updateDurationLabels();
   bindEvents();
   renderTrackerLogs();
+  renderAiHistoryList();
 
   try {
     els.loading?.classList.remove('hidden');

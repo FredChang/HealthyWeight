@@ -322,6 +322,136 @@
 
     <!-- ==================== 畫面 3：多種飲食套餐選擇與自由混搭 ==================== -->
     <section id="screen-meals" class="screen hidden">
+      <!-- 📸 AI 拍照與外食熱量計算卡片 -->
+      <div class="card ai-food-card">
+        <div class="card-title-row">
+          <div>
+            <h2 class="card-title">📸 同事外食／聚餐救星：AI 拍照算卡路里</h2>
+            <p class="pool-text" style="margin:3px 0 0">外食無法照套餐吃？拍下眼前的便當、聚餐或直接輸入菜名，AI 立即精算熱量並給您當下減脂微調與下一餐補救建議！</p>
+          </div>
+          <span class="status-badge">🤖 Gemini Vision AI</span>
+        </div>
+
+        <!-- 拍照與相簿上傳按鈕列 -->
+        <input type="file" id="ai-camera-input" class="hidden" accept="image/*" capture="environment" />
+        <input type="file" id="ai-gallery-input" class="hidden" accept="image/*" />
+
+        <div class="ai-upload-row">
+          <button type="button" id="ai-camera-btn" class="btn-primary ai-upload-btn">
+            📷 拍照辨識餐點
+          </button>
+          <button type="button" id="ai-gallery-btn" class="btn-secondary ai-upload-btn">
+            🖼️ 從相簿選照片
+          </button>
+        </div>
+
+        <!-- 照片預覽區 -->
+        <div id="ai-image-preview-wrap" class="ai-image-preview-wrap hidden">
+          <img id="ai-image-preview" src="" alt="餐點預覽圖" />
+          <button type="button" id="ai-remove-image-btn" class="ai-remove-img-btn">✕ 移除照片</button>
+        </div>
+
+        <!-- 文字補充或無照片直接描述外食 -->
+        <div class="field-group" style="margin-top:12px">
+          <label class="field-label" for="ai-food-note">💬 補充說明外食內容（或沒拍照直接輸入菜色與份量）：</label>
+          <input type="text" id="ai-food-note" class="text-input" placeholder="例如：跟同事吃泰式簡餐，打拋豬飯吃一半、炸雞去皮、配無糖綠茶" />
+        </div>
+
+        <div class="preset-row" style="margin-top:8px;margin-bottom:12px">
+          <button type="button" class="preset-chip ai-quick-note" data-note="台式炸排骨便當（白飯只吃一半、排骨去皮、配三樣炒青菜）">🍱 排骨便當飯半碗</button>
+          <button type="button" class="preset-chip ai-quick-note" data-note="同事聚餐日式涮涮鍋（梅花豬肉一盤、大量蔬菜豆腐、不吃加工火鍋料、冬粉半把）">🍲 聚餐涮涮鍋</button>
+          <button type="button" class="preset-chip ai-quick-note" data-note="紅燒牛肉麵一碗（湯只喝三口、加點燙青菜與滷海帶豆干）">🍜 牛肉麵不喝湯</button>
+          <button type="button" class="preset-chip ai-quick-note" data-note="早餐店里肌豬排蛋吐司不抹美乃滋＋大杯無糖豆漿">🥪 早餐店豬排蛋</button>
+        </div>
+
+        <button type="button" id="ai-analyze-btn" class="btn-primary" style="width:100%">
+          ✨ 立即請 AI 分析這餐熱量與外食調整建議
+        </button>
+
+        <!-- AI 分析載入狀態 -->
+        <div id="ai-loading-box" class="ai-loading-box hidden">
+          <span class="ai-spinner"></span>
+          <span id="ai-loading-text">🤖 AI 營養師正在辨識食物品項與估算熱量中（約 2~4 秒）…</span>
+        </div>
+
+        <!-- AI 分析錯誤提示 -->
+        <div id="ai-error-box" class="safety-banner hidden" style="margin-top:12px;margin-bottom:0"></div>
+
+        <!-- AI 分析結果面板 -->
+        <div id="ai-result-panel" class="ai-result-panel hidden">
+          <div class="ai-result-header">
+            <div>
+              <span id="ai-res-fit" class="ai-fit-badge">🟡 需微調份量</span>
+              <h3 id="ai-res-title" class="ai-res-title">外食餐點分析</h3>
+            </div>
+            <div class="plan-kcal-badge">
+              <span id="ai-res-kcal" class="plan-kcal-num">0 kcal</span>
+              <span id="ai-res-pct" class="plan-macro-sub">佔今日目標 0%</span>
+            </div>
+          </div>
+
+          <div class="ai-macro-grid">
+            <div class="ai-macro-box">
+              <span>🥩 蛋白質</span>
+              <strong id="ai-res-p">0g</strong>
+            </div>
+            <div class="ai-macro-box">
+              <span>🍠 碳水化合物</span>
+              <strong id="ai-res-c">0g</strong>
+            </div>
+            <div class="ai-macro-box">
+              <span>🥑 脂肪</span>
+              <strong id="ai-res-f">0g</strong>
+            </div>
+          </div>
+
+          <!-- 逐項食物明細 -->
+          <div class="ai-items-wrap">
+            <div class="sub-heading" style="margin-top:0">🔍 AI 辨識食材與熱量拆解：</div>
+            <div id="ai-res-items" class="ai-items-list"></div>
+          </div>
+
+          <!-- AI 當下減脂微調與下一餐補救建議 -->
+          <div class="ai-advice-box">
+            <div class="ai-advice-item">
+              <strong>💡 當下聰明吃法微調：</strong>
+              <p id="ai-res-coach-tip"></p>
+            </div>
+            <div class="ai-advice-item" style="margin-top:8px">
+              <strong>🍽️ 下一餐補救與今日剩餘配額建議：</strong>
+              <p id="ai-res-next-meal"></p>
+            </div>
+          </div>
+
+          <div class="plan-actions-row">
+            <button type="button" id="ai-add-to-tray-btn" class="btn-secondary">
+              ➕ 加入下方「今日餐盤累計」
+            </button>
+            <button type="button" id="ai-add-to-log-btn" class="btn-primary">
+              ✍️ 帶入今日體重飲食打卡
+            </button>
+          </div>
+        </div>
+
+        <!-- API 金鑰與歷史紀錄折疊區 -->
+        <div class="ai-footer-row">
+          <details class="ai-settings-details">
+            <summary>🔑 API 金鑰設定與最近外食分析紀錄</summary>
+            <div class="ai-settings-body">
+              <label class="field-label" for="ai-api-key-input">Gemini API Key（已內建預設金鑰，亦可自行更換並存於此裝置）：</label>
+              <div class="ai-key-row">
+                <input type="password" id="ai-api-key-input" class="text-input" placeholder="已自動啟用預設 API Key（若需更換請貼上）" />
+                <button type="button" id="ai-save-key-btn" class="btn-secondary">儲存金鑰</button>
+              </div>
+              <p id="ai-key-status" class="pool-text" style="margin:6px 0 10px">✅ 目前已啟用內建 API Key，可直接拍照或輸入文字分析。</p>
+
+              <div class="sub-heading">🕘 最近 AI 外食分析紀錄（點擊可重新載入）：</div>
+              <div id="ai-history-list" class="ai-history-list"></div>
+            </div>
+          </details>
+        </div>
+      </div>
+
       <div class="card meal-header-card">
         <div class="meal-header-top">
           <div>
@@ -461,6 +591,6 @@
     </footer>
   </div>
 
-  <script type="module" src="js/app.js?v=1.0.0"></script>
+  <script type="module" src="js/app.js?v=1.1.0"></script>
 </body>
 </html>

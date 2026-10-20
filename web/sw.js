@@ -1,4 +1,4 @@
-const CACHE = 'healthyweight-v1.0.0';
+const CACHE = 'healthyweight-v1.1.0';
 
 const PRECACHE_ASSETS = [
   './',
@@ -6,6 +6,7 @@ const PRECACHE_ASSETS = [
   './css/app.css',
   './js/app.js',
   './js/calculator.js',
+  './js/ai-food.js',
   './js/version.js',
   './diet-plans.json',
   './manifest.webmanifest',
