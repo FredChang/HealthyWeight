@@ -1129,6 +1129,10 @@ async function loadDietDatabase() {
 }
 
 async function init() {
+  const headerVer = document.getElementById('header-version');
+  if (headerVer) {
+    headerVer.textContent = `v${APP_VERSION}`;
+  }
   if (els.appVersion) {
     els.appVersion.textContent = `版本 v${APP_VERSION}`;
   }
