@@ -13,8 +13,8 @@ import {
   hasCustomApiKey,
   loadAiFoodHistory,
   saveAiFoodHistoryItem
-} from './ai-food.js';
-import { APP_VERSION } from './version.js';
+} from './ai-food.js?v=1.1.5';
+import { APP_VERSION } from './version.js?v=1.1.5';
 
 const STORAGE_KEYS = {
   PROFILE: 'hw_user_profile_v1',
@@ -1129,16 +1129,27 @@ async function loadDietDatabase() {
 }
 
 async function init() {
+  const cleanVer = String(APP_VERSION).split(' ')[0];
   const headerVer = document.getElementById('header-version');
   if (headerVer) {
-    headerVer.textContent = `v${APP_VERSION}`;
+    headerVer.textContent = `v${cleanVer}`;
   }
   if (els.appVersion) {
-    els.appVersion.textContent = `版本 v${APP_VERSION}`;
+    els.appVersion.textContent = `版本 v${cleanVer}`;
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+    navigator.serviceWorker
+      .register('./sw.js?v=1.1.5', { updateViaCache: 'none' })
+      .then((reg) => reg.update().catch(() => {}))
+      .catch(() => {});
   }
 
   loadProfileFromStorage();

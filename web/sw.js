@@ -1,4 +1,4 @@
-const CACHE = 'healthyweight-v1.1.4';
+const CACHE = 'healthyweight-v1.1.5';
 
 const PRECACHE_ASSETS = [
   './',
@@ -24,7 +24,7 @@ function isSameOrigin(request) {
 async function networkFirst(request) {
   const cache = await caches.open(CACHE);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response && response.status === 200) {
       await cache.put(request, response.clone());
       return response;
@@ -42,7 +42,7 @@ self.addEventListener('install', (event) => {
     (async () => {
       const cache = await caches.open(CACHE);
       await Promise.allSettled(
-        PRECACHE_ASSETS.map((asset) => cache.add(asset).catch(() => {}))
+        PRECACHE_ASSETS.map((asset) => cache.add(new Request(asset, { cache: 'no-cache' })).catch(() => {}))
       );
       await self.skipWaiting();
     })()
