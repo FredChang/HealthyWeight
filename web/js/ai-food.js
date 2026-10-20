@@ -123,25 +123,37 @@ export function captureVideoFrame(videoEl, maxEdge = 1024, quality = 0.85) {
 }
 
 /**
- * 呼叫 Gemini 多模態視覺模型分析餐點照片與文字描述
+ * 呼叫 Gemini 多模態視覺模型分析餐點照片（支援單張或多張）與文字描述
  */
-export async function analyzeFoodWithAi({ imageBase64, mimeType, userNote, dietContext }) {
+export async function analyzeFoodWithAi({ images = [], imageBase64, mimeType, userNote, dietContext }) {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('請先設定有效的 Gemini API Key');
   }
 
+  const imageList = Array.isArray(images) && images.length > 0
+    ? images
+    : imageBase64
+      ? [{ base64Data: imageBase64, mimeType: mimeType || 'image/jpeg' }]
+      : [];
+
   const methodName = dietContext?.methodName || '168 間歇性斷食';
   const targetKcal = dietContext?.targetCalories || 1400;
   const targetP = dietContext?.proteinGrams || 105;
 
+  const multiPhotoHint =
+    imageList.length > 1
+      ? `使用者共上傳了 ${imageList.length} 張餐點照片，請綜合所有照片中的餐點、配菜、湯品或飲品一併辨識與加總（若為同一道菜的不同角度請勿重複計算）。`
+      : '請根據照片中的餐點進行辨識與估算。';
+
   const promptText = `你是一位專精台灣外食與飲食管理的專業營養師。
 使用者目前正在執行「${methodName}」，每日目標總熱量為 ${targetKcal} kcal（每日目標蛋白質 ${targetP}g）。
-${userNote ? `使用者補充說明：「${userNote}」` : '請根據照片中的餐點進行辨識與估算。'}
+${imageList.length > 0 ? multiPhotoHint : ''}
+${userNote ? `使用者補充說明：「${userNote}」` : ''}
 
 請仔細辨識餐點中的所有食物品項、烹調方式（如油炸、滷製、清炒、醬汁）與估計份量，並回傳嚴格符合以下結構的 JSON 物件（使用繁體中文）：
 {
-  "mealName": "餐點整體名稱（例如：台式炸排骨便當 / 同事聚餐泰式料理）",
+  "mealName": "餐點整體名稱（例如：台式炸排骨便當＋無糖綠茶 / 同事聚餐合菜組合）",
   "totalCalories": 750,
   "proteinGrams": 32,
   "carbsGrams": 85,
@@ -162,13 +174,15 @@ ${userNote ? `使用者補充說明：「${userNote}」` : '請根據照片中�
 }`;
 
   const parts = [];
-  if (imageBase64) {
-    parts.push({
-      inline_data: {
-        mime_type: mimeType || 'image/jpeg',
-        data: imageBase64
-      }
-    });
+  for (const img of imageList) {
+    if (img?.base64Data) {
+      parts.push({
+        inline_data: {
+          mime_type: img.mimeType || 'image/jpeg',
+          data: img.base64Data
+        }
+      });
+    }
   }
   parts.push({ text: promptText });
 

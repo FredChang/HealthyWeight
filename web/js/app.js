@@ -5,7 +5,7 @@ import {
   evaluateMetabolicCalibration,
   getPortionAdjustmentAdvice,
   formatDateShort
-} from './calculator.js?v=1.3.1';
+} from './calculator.js?v=1.3.2';
 import {
   compressImageFile,
   captureVideoFrame,
@@ -14,8 +14,8 @@ import {
   hasCustomApiKey,
   loadAiFoodHistory,
   saveAiFoodHistoryItem
-} from './ai-food.js?v=1.3.1';
-import { APP_VERSION } from './version.js?v=1.3.1';
+} from './ai-food.js?v=1.3.2';
+import { APP_VERSION } from './version.js?v=1.3.2';
 
 const STORAGE_KEYS = {
   PROFILE: 'hw_user_profile_v1',
@@ -31,7 +31,7 @@ let highlightedPlanId = null;
 let lastCalculation = null;
 let customTray = [];
 let currentModalShoppingText = '';
-let currentAiImage = null;
+let currentAiImages = [];
 let lastAiAnalysis = null;
 let cameraStream = null;
 let cameraFacingMode = 'environment';
@@ -108,7 +108,8 @@ const els = {
   aiSnapBtn: document.getElementById('ai-snap-btn'),
   aiCloseCamBtn: document.getElementById('ai-close-cam-btn'),
   aiImagePreviewWrap: document.getElementById('ai-image-preview-wrap'),
-  aiImagePreview: document.getElementById('ai-image-preview'),
+  aiImageCountBadge: document.getElementById('ai-image-count-badge'),
+  aiImagesGrid: document.getElementById('ai-images-grid'),
   aiRemoveImageBtn: document.getElementById('ai-remove-image-btn'),
   aiFoodNote: document.getElementById('ai-food-note'),
   aiAnalyzeBtn: document.getElementById('ai-analyze-btn'),
@@ -761,7 +762,7 @@ function updateCustomMealSummary() {
   }
 }
 
-/* ==================== 📸 AI 拍照算卡路里與外食分析 ==================== */
+/* ==================== 📸 AI 拍照算卡路里與外食分析（支援多張連拍與多選） ==================== */
 function stopLiveCamera() {
   if (cameraStream) {
     cameraStream.getTracks().forEach((track) => track.stop());
@@ -771,6 +772,42 @@ function stopLiveCamera() {
     els.aiCameraVideo.srcObject = null;
   }
   els.aiCameraLiveWrap?.classList.add('hidden');
+}
+
+function renderAiImagesPreview() {
+  if (!els.aiImagePreviewWrap || !els.aiImagesGrid) return;
+
+  const count = currentAiImages.length;
+  if (els.aiSnapBtn) {
+    els.aiSnapBtn.textContent = count > 0 ? `📸 再拍一張 (已拍 ${count} 張)` : '📸 拍照加入';
+  }
+
+  if (count === 0) {
+    els.aiImagePreviewWrap.classList.add('hidden');
+    els.aiImagesGrid.innerHTML = '';
+    return;
+  }
+
+  els.aiImagePreviewWrap.classList.remove('hidden');
+  if (els.aiImageCountBadge) {
+    els.aiImageCountBadge.textContent = `已選擇 ${count} 張餐點照片（可繼續拍照或選照片疊加）`;
+  }
+
+  els.aiImagesGrid.innerHTML = '';
+  currentAiImages.forEach((imgObj, idx) => {
+    const card = document.createElement('div');
+    card.className = 'ai-thumb-card';
+    card.innerHTML = `
+      <img src="${imgObj.dataUrl}" alt="餐點照片 ${idx + 1}" />
+      <span class="ai-thumb-index">#${idx + 1}</span>
+      <button type="button" class="ai-thumb-remove-btn" title="移除這張照片" data-rm-img="${idx}">✕</button>
+    `;
+    card.querySelector('[data-rm-img]')?.addEventListener('click', () => {
+      currentAiImages.splice(idx, 1);
+      renderAiImagesPreview();
+    });
+    els.aiImagesGrid.appendChild(card);
+  });
 }
 
 async function openLiveCamera() {
@@ -795,7 +832,7 @@ async function openLiveCamera() {
       els.aiCameraVideo.srcObject = cameraStream;
       await els.aiCameraVideo.play().catch(() => {});
     }
-    els.aiImagePreviewWrap?.classList.add('hidden');
+    renderAiImagesPreview();
     els.aiCameraLiveWrap?.classList.remove('hidden');
   } catch (err) {
     // 若使用者裝置不支援或拒絕權限，退回原生相機 input
@@ -811,26 +848,27 @@ async function switchLiveCamera() {
 function snapLiveCameraPhoto() {
   if (!els.aiCameraVideo || !cameraStream) return;
   const captured = captureVideoFrame(els.aiCameraVideo);
-  stopLiveCamera();
-  currentAiImage = captured;
-  if (els.aiImagePreview) {
-    els.aiImagePreview.src = captured.dataUrl;
-  }
-  els.aiImagePreviewWrap?.classList.remove('hidden');
-  runAiFoodAnalysis();
+  currentAiImages.push({
+    id: `cam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    ...captured
+  });
+  renderAiImagesPreview();
 }
 
-async function handleAiImageSelect(file) {
-  if (!file) return;
+async function handleAiImagesSelect(fileList) {
+  const files = Array.from(fileList || []).filter((f) => f && f.type.startsWith('image/'));
+  if (files.length === 0) return;
   stopLiveCamera();
   els.aiErrorBox?.classList.add('hidden');
   try {
-    const compressed = await compressImageFile(file);
-    currentAiImage = compressed;
-    if (els.aiImagePreview) {
-      els.aiImagePreview.src = compressed.dataUrl;
-    }
-    els.aiImagePreviewWrap?.classList.remove('hidden');
+    const compressedList = await Promise.all(files.map((file) => compressImageFile(file)));
+    compressedList.forEach((compressed) => {
+      currentAiImages.push({
+        id: `gal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        ...compressed
+      });
+    });
+    renderAiImagesPreview();
   } catch (err) {
     if (els.aiErrorBox) {
       els.aiErrorBox.textContent = `⚠️ 讀取照片失敗：${err.message}`;
@@ -905,10 +943,11 @@ function renderAiHistoryList() {
 }
 
 async function runAiFoodAnalysis() {
+  stopLiveCamera();
   const userNote = els.aiFoodNote?.value.trim() || '';
-  if (!currentAiImage && !userNote) {
+  if (currentAiImages.length === 0 && !userNote) {
     if (els.aiErrorBox) {
-      els.aiErrorBox.textContent = '📸 請先「開啟相機拍照／選取餐點照片」，或在文字框輸入外食菜色（例如：排骨便當飯吃一半）！';
+      els.aiErrorBox.textContent = '📸 請先「開啟相機拍照／選取餐點照片（可多張）」，或在文字框輸入外食菜色！';
       els.aiErrorBox.classList.remove('hidden');
     }
     return;
@@ -924,8 +963,7 @@ async function runAiFoodAnalysis() {
     const proteinGrams = lastCalculation?.calc?.macros?.proteinGrams || 105;
 
     const { result } = await analyzeFoodWithAi({
-      imageBase64: currentAiImage?.base64Data || null,
-      mimeType: currentAiImage?.mimeType || 'image/jpeg',
+      images: currentAiImages,
       userNote,
       dietContext: {
         methodName: method?.name || '168 間歇性斷食',
@@ -1425,20 +1463,24 @@ function bindEvents() {
   });
 
   els.aiCameraInput?.addEventListener('change', (e) => {
-    const file = e.target.files?.[0];
-    if (file) handleAiImageSelect(file);
+    if (e.target.files?.length) {
+      handleAiImagesSelect(e.target.files);
+    }
+    e.target.value = '';
   });
 
   els.aiGalleryInput?.addEventListener('change', (e) => {
-    const file = e.target.files?.[0];
-    if (file) handleAiImageSelect(file);
+    if (e.target.files?.length) {
+      handleAiImagesSelect(e.target.files);
+    }
+    e.target.value = '';
   });
 
   els.aiRemoveImageBtn?.addEventListener('click', () => {
-    currentAiImage = null;
+    currentAiImages = [];
     if (els.aiCameraInput) els.aiCameraInput.value = '';
     if (els.aiGalleryInput) els.aiGalleryInput.value = '';
-    els.aiImagePreviewWrap?.classList.add('hidden');
+    renderAiImagesPreview();
   });
 
   document.querySelectorAll('.ai-quick-note').forEach((chip) => {
@@ -1757,7 +1799,7 @@ async function init() {
       }
     });
     navigator.serviceWorker
-      .register('./sw.js?v=1.3.1', { updateViaCache: 'none' })
+      .register('./sw.js?v=1.3.2', { updateViaCache: 'none' })
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
   }
