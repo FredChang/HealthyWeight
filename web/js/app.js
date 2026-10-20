@@ -5,7 +5,7 @@ import {
   evaluateMetabolicCalibration,
   getPortionAdjustmentAdvice,
   formatDateShort
-} from './calculator.js?v=1.3.0';
+} from './calculator.js?v=1.3.1';
 import {
   compressImageFile,
   captureVideoFrame,
@@ -14,8 +14,8 @@ import {
   hasCustomApiKey,
   loadAiFoodHistory,
   saveAiFoodHistoryItem
-} from './ai-food.js?v=1.3.0';
-import { APP_VERSION } from './version.js?v=1.3.0';
+} from './ai-food.js?v=1.3.1';
+import { APP_VERSION } from './version.js?v=1.3.1';
 
 const STORAGE_KEYS = {
   PROFILE: 'hw_user_profile_v1',
@@ -1553,6 +1553,15 @@ function bindEvents() {
   document.getElementById('edit-profile-btn')?.addEventListener('click', () => switchTab('setup'));
   document.getElementById('back-to-setup-btn')?.addEventListener('click', () => switchTab('setup'));
   document.getElementById('go-to-meals-btn')?.addEventListener('click', () => switchTab('meals'));
+  document.getElementById('go-to-history-btn')?.addEventListener('click', () => {
+    renderTrackerLogs();
+    updateCalibrationPreview();
+    switchTab('history');
+  });
+  document.getElementById('back-to-tracker-btn')?.addEventListener('click', () => {
+    renderTodayCheckinDashboard();
+    switchTab('tracker');
+  });
   els.goToAiFoodBtn?.addEventListener('click', () => switchTab('meals'));
 
   // 套餐分類篩選
@@ -1748,7 +1757,7 @@ async function init() {
       }
     });
     navigator.serviceWorker
-      .register('./sw.js?v=1.3.0', { updateViaCache: 'none' })
+      .register('./sw.js?v=1.3.1', { updateViaCache: 'none' })
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
   }

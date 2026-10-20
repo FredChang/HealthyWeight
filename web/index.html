@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
-  <link rel="stylesheet" href="css/app.css?v=1.3.0" />
+  <link rel="stylesheet" href="css/app.css?v=1.3.1" />
 </head>
 <body>
   <div id="loading" class="loading-overlay hidden">載入飲食資料庫中…</div>
@@ -19,11 +19,14 @@
   <div class="app">
     <!-- 頂部品牌與導覽列 -->
     <header class="top-bar">
-      <div class="brand-row">
-        <div class="brand-logo">🥗</div>
-        <div>
-          <h1 class="brand-title">HealthyWeight <span id="header-version" class="brand-sub">v1.3.0</span></h1>
+      <div class="brand-row" style="justify-content: space-between">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <div class="brand-logo">🥗</div>
+          <div>
+            <h1 class="brand-title">HealthyWeight <span id="header-version" class="brand-sub">v1.3.1</span></h1>
+          </div>
         </div>
+        <button type="button" class="nav-tab history-top-btn" data-tab="history">🗂️ 歷史與校正</button>
       </div>
 
       <nav class="nav-tabs" aria-label="功能切換">
@@ -31,7 +34,6 @@
         <button type="button" class="nav-tab" data-tab="result">2. 減重預測</button>
         <button type="button" class="nav-tab" data-tab="meals">3. 飲食套餐</button>
         <button type="button" class="nav-tab" data-tab="tracker">4. 今日打卡</button>
-        <button type="button" class="nav-tab" data-tab="history">5. 歷史與校正</button>
       </nav>
     </header>
 
@@ -315,10 +317,9 @@
       <div class="card ai-food-card">
         <div class="card-title-row">
           <div>
-            <h2 class="card-title">📸 同事外食／聚餐救星：AI 拍照算卡路里</h2>
-            <p class="pool-text" style="margin:3px 0 0">外食無法照套餐吃？拍下眼前的便當、聚餐或直接輸入菜名，AI 立即精算熱量並給您當下減脂微調與下一餐補救建議！</p>
+            <h2 class="card-title">📸 AI登錄</h2>
+            <p class="pool-text" style="margin:3px 0 0">透過圖片與文字敘述由AI換算後進行登錄</p>
           </div>
-          <span class="status-badge">🤖 Gemini Vision AI</span>
         </div>
 
         <!-- 拍照與相簿上傳按鈕列 -->
@@ -350,27 +351,20 @@
           <button type="button" id="ai-remove-image-btn" class="ai-remove-img-btn">✕ 移除照片</button>
         </div>
 
-        <!-- 文字補充或無照片直接描述外食 -->
-        <div class="field-group" style="margin-top:12px">
-          <label class="field-label" for="ai-food-note">💬 補充說明外食內容（或沒拍照直接輸入菜色與份量）：</label>
-          <input type="text" id="ai-food-note" class="text-input" placeholder="例如：跟同事吃泰式簡餐，打拋豬飯吃一半、炸雞去皮、配無糖綠茶" />
-        </div>
-
-        <div class="preset-row" style="margin-top:8px;margin-bottom:12px">
-          <button type="button" class="preset-chip ai-quick-note" data-note="台式炸排骨便當（白飯只吃一半、排骨去皮、配三樣炒青菜）">🍱 排骨便當飯半碗</button>
-          <button type="button" class="preset-chip ai-quick-note" data-note="同事聚餐日式涮涮鍋（梅花豬肉一盤、大量蔬菜豆腐、不吃加工火鍋料、冬粉半把）">🍲 聚餐涮涮鍋</button>
-          <button type="button" class="preset-chip ai-quick-note" data-note="紅燒牛肉麵一碗（湯只喝三口、加點燙青菜與滷海帶豆干）">🍜 牛肉麵不喝湯</button>
-          <button type="button" class="preset-chip ai-quick-note" data-note="早餐店里肌豬排蛋吐司不抹美乃滋＋大杯無糖豆漿">🥪 早餐店豬排蛋</button>
+        <!-- 圖片補充或純文字描述 -->
+        <div class="field-group" style="margin-top:12px;margin-bottom:12px">
+          <label class="field-label" for="ai-food-note">圖片補充或純文字描述</label>
+          <input type="text" id="ai-food-note" class="text-input" placeholder="例如：排骨便當飯吃一半、炸雞去皮、無糖綠茶" />
         </div>
 
         <button type="button" id="ai-analyze-btn" class="btn-primary" style="width:100%">
-          ✨ 立即請 AI 分析這餐熱量與外食調整建議
+          ✨ AI 換算熱量
         </button>
 
         <!-- AI 分析載入狀態 -->
         <div id="ai-loading-box" class="ai-loading-box hidden">
           <span class="ai-spinner"></span>
-          <span id="ai-loading-text">🤖 AI 營養師正在辨識食物品項與估算熱量中（約 2~4 秒）…</span>
+          <span id="ai-loading-text">🤖 AI 正在換算食物熱量中…</span>
         </div>
 
         <!-- AI 分析錯誤提示 -->
@@ -381,7 +375,7 @@
           <div class="ai-result-header">
             <div>
               <span id="ai-res-fit" class="ai-fit-badge">🟡 需微調份量</span>
-              <h3 id="ai-res-title" class="ai-res-title">外食餐點分析</h3>
+              <h3 id="ai-res-title" class="ai-res-title">餐點熱量分析</h3>
             </div>
             <div class="plan-kcal-badge">
               <span id="ai-res-kcal" class="plan-kcal-num">0 kcal</span>
@@ -406,48 +400,30 @@
 
           <!-- 逐項食物明細 -->
           <div class="ai-items-wrap">
-            <div class="sub-heading" style="margin-top:0">🔍 AI 辨識食材與熱量拆解：</div>
+            <div class="sub-heading" style="margin-top:0">🔍 食材與熱量拆解：</div>
             <div id="ai-res-items" class="ai-items-list"></div>
           </div>
 
           <!-- AI 當下減脂微調與下一餐補救建議 -->
           <div class="ai-advice-box">
             <div class="ai-advice-item">
-              <strong>💡 當下聰明吃法微調：</strong>
+              <strong>💡 飲食微調建議：</strong>
               <p id="ai-res-coach-tip"></p>
             </div>
             <div class="ai-advice-item" style="margin-top:8px">
-              <strong>🍽️ 下一餐補救與今日剩餘配額建議：</strong>
+              <strong>🍽️ 下一餐建議：</strong>
               <p id="ai-res-next-meal"></p>
             </div>
           </div>
 
           <div class="plan-actions-row">
             <button type="button" id="ai-add-to-tray-btn" class="btn-secondary">
-              ➕ 加入下方「今日餐盤累計」
+              ➕ 加入下方餐盤
             </button>
             <button type="button" id="ai-add-to-log-btn" class="btn-primary">
-              ✅ 打卡記錄這餐熱量
+              ✅ 打卡登錄這餐熱量
             </button>
           </div>
-        </div>
-
-        <!-- API 金鑰與歷史紀錄折疊區 -->
-        <div class="ai-footer-row">
-          <details class="ai-settings-details">
-            <summary>🔑 API 金鑰設定與最近外食分析紀錄</summary>
-            <div class="ai-settings-body">
-              <label class="field-label" for="ai-api-key-input">Gemini API Key（已內建預設金鑰，亦可自行更換並存於此裝置）：</label>
-              <div class="ai-key-row">
-                <input type="password" id="ai-api-key-input" class="text-input" placeholder="已自動啟用預設 API Key（若需更換請貼上）" />
-                <button type="button" id="ai-save-key-btn" class="btn-secondary">儲存金鑰</button>
-              </div>
-              <p id="ai-key-status" class="pool-text" style="margin:6px 0 10px">✅ 目前已啟用內建 API Key，可直接拍照或輸入文字分析。</p>
-
-              <div class="sub-heading">🕘 最近 AI 外食分析紀錄（點擊可重新載入）：</div>
-              <div id="ai-history-list" class="ai-history-list"></div>
-            </div>
-          </details>
         </div>
       </div>
 
@@ -522,44 +498,43 @@
       </div>
     </section>
 
-    <!-- ==================== 畫面 4：今日打卡（熱量結算、已吃/剩餘/運動、今日體重與昨日比較） ==================== -->
+    <!-- ==================== 畫面 4：今日打卡（已吃/運動/預估剩餘卡路里、今日體重與昨日比較） ==================== -->
     <section id="screen-tracker" class="screen hidden">
-      <!-- 卡片 1：🔥 今日熱量結算看板 -->
+      <!-- 卡片 1：🔥 今日熱量看板（已吃多少卡、運動消耗多少卡、預估還有多少卡） -->
       <div class="card today-hero-card">
         <div class="card-title-row">
           <div>
-            <h2 class="card-title">🔥 今日熱量即時結算</h2>
-            <p class="pool-text" style="margin:2px 0 0">預估還可吃熱量 ＝ 每日目標熱量 ＋ 今日運動消耗 － 已經吃下熱量</p>
+            <h2 class="card-title">🔥 今日熱量打卡看板</h2>
+            <p class="pool-text" style="margin:2px 0 0">
+              每日基準目標：<strong id="today-target-kcal">1,380</strong> kcal（預估剩餘 ＝ 目標 ＋ 運動 － 已吃）
+            </p>
           </div>
-          <span id="today-kcal-status" class="status-badge">🟢 熱量控制良好</span>
+          <button type="button" id="go-to-history-btn" class="btn-secondary" style="font-size:0.8rem;padding:6px 10px">
+            🗂️ 歷史與代謝校正 ➔
+          </button>
         </div>
 
-        <div class="today-kcal-grid">
+        <div class="today-kcal-grid-3">
           <div class="today-kcal-box eaten">
             <span class="today-kcal-label">🍽️ 已經吃了多少卡</span>
             <strong id="today-eaten-kcal" class="today-kcal-val">0</strong>
-            <span class="today-kcal-unit">kcal (今日已攝取)</span>
-          </div>
-          <div class="today-kcal-box remain">
-            <span class="today-kcal-label">✨ 預估還有多少卡</span>
-            <strong id="today-remaining-kcal" class="today-kcal-val highlight">1,380</strong>
-            <span id="today-remaining-sub" class="today-kcal-unit">kcal (今日剩餘配額)</span>
+            <span class="today-kcal-unit">kcal</span>
           </div>
           <div class="today-kcal-box exercise">
             <span class="today-kcal-label">🏃 運動消耗多少卡</span>
             <strong id="today-exercise-kcal" class="today-kcal-val">+0</strong>
-            <span class="today-kcal-unit">kcal (額外增加配額)</span>
+            <span class="today-kcal-unit">kcal</span>
           </div>
-          <div class="today-kcal-box target">
-            <span class="today-kcal-label">🎯 每日基準目標</span>
-            <strong id="today-target-kcal" class="today-kcal-val">1,380</strong>
-            <span class="today-kcal-unit">kcal / 日</span>
+          <div class="today-kcal-box remain">
+            <span class="today-kcal-label">✨ 預估還有多少卡</span>
+            <strong id="today-remaining-kcal" class="today-kcal-val highlight">1,380</strong>
+            <span id="today-remaining-sub" class="today-kcal-unit">kcal 可攝取</span>
           </div>
         </div>
 
         <div class="today-progress-wrap">
           <div class="today-progress-header">
-            <span id="today-macro-summary">今日累計營養素：蛋白質 0g · 碳水 0g · 脂肪 0g</span>
+            <span id="today-macro-summary">蛋白質 0g · 碳水 0g · 脂肪 0g</span>
             <span id="today-progress-pct">0%</span>
           </div>
           <div class="macro-bar-track" style="height:10px">
@@ -568,25 +543,57 @@
         </div>
       </div>
 
-      <!-- 卡片 2：⚖️ 今日體重打卡 ＆ 與昨日比較 -->
+      <!-- 卡片 2：🍽️ 今日已打卡飲食明細 ＆ 🏃 運動消耗 -->
       <div class="card">
         <div class="card-title-row">
-          <h2 class="card-title">⚖️ 今日體重打卡 ＆ 與昨日比較</h2>
-          <span id="weight-compare-badge" class="status-badge">等待輸入今日體重</span>
+          <h2 class="card-title">🍽️ 今日飲食明細</h2>
+          <button type="button" id="go-to-ai-food-btn" class="btn-secondary" style="font-size:0.8rem;padding:6px 10px">
+            📸 去 AI 登錄／選套餐
+          </button>
+        </div>
+
+        <div id="today-meals-list" class="today-meals-list"></div>
+
+        <div class="manual-meal-row">
+          <input type="text" id="manual-meal-name" class="text-input" placeholder="手動輸入食物名稱" />
+          <input type="number" id="manual-meal-kcal" class="text-input manual-kcal-input" min="0" max="5000" step="10" placeholder="kcal" />
+          <button type="button" id="add-manual-meal-btn" class="btn-secondary" style="white-space:nowrap">➕ 補登</button>
+        </div>
+
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid #e2e8f0">
+          <div class="card-title-row" style="margin-bottom:8px">
+            <label class="field-label" for="log-exercise" style="margin:0;font-size:0.95rem">🏃 今日運動消耗熱量 (kcal)</label>
+            <button type="button" class="btn-ghost ex-quick-btn" data-kcal="0" style="padding:2px 8px">🧹 歸零</button>
+          </div>
+          <div class="preset-row" style="margin-bottom:8px">
+            <button type="button" class="preset-chip ex-quick-btn" data-kcal="130">🚶 快走 +130</button>
+            <button type="button" class="preset-chip ex-quick-btn" data-kcal="260">🏃 慢跑 +260</button>
+            <button type="button" class="preset-chip ex-quick-btn" data-kcal="220">🏋️ 重訓 +220</button>
+            <button type="button" class="preset-chip ex-quick-btn" data-kcal="240">🚴 飛輪 +240</button>
+            <button type="button" class="preset-chip ex-quick-btn" data-kcal="350">🏊 游泳 +350</button>
+          </div>
+          <input type="number" id="log-exercise" class="text-input" step="10" min="0" max="4000" value="0" placeholder="0" />
+        </div>
+      </div>
+
+      <!-- 卡片 3：⚖️ 今日體重 ＆ 與昨日比較 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">⚖️ 今日體重與昨日比較</h2>
+          <span id="weight-compare-badge" class="status-badge">等待輸入體重</span>
         </div>
 
         <div class="form-grid-2">
           <div class="field-group">
-            <label class="field-label" for="log-date">📅 打卡日期</label>
+            <label class="field-label" for="log-date">📅 日期</label>
             <input type="date" id="log-date" class="text-input" />
           </div>
           <div class="field-group">
-            <label class="field-label" for="log-weight">⚖️ 輸入今日體重 (kg)</label>
+            <label class="field-label" for="log-weight">⚖️ 今日體重 (kg)</label>
             <input type="number" id="log-weight" class="text-input" step="0.1" min="30" max="200" placeholder="例如 63.5" />
           </div>
         </div>
 
-        <!-- 與昨日/前次體重即時對比面板 -->
         <div id="weight-compare-box" class="weight-compare-box">
           <div class="weight-compare-item">
             <span id="compare-prev-label" class="pool-text">昨日／前次體重</span>
@@ -603,93 +610,32 @@
           </div>
         </div>
 
-        <div class="form-grid-2" style="margin-top:12px">
-          <div class="field-group">
-            <label class="field-label" for="log-status">🍽️ 今日斷食與飲食狀態</label>
-            <select id="log-status" class="select-input">
-              <option value="✅ 完美達標">✅ 完美達標（完成斷食與控卡）</option>
-              <option value="👍 大致達標">👍 大致達標（微幅超標但健康）</option>
-              <option value="🎉 聚餐彈性日">🎉 聚餐彈性日（開心聚餐明日繼續）</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label class="field-label" for="log-note">📝 今日備註（選填）</label>
-            <input type="text" id="log-note" class="text-input" placeholder="例如：睡眠充足、喝水 2500ml" />
-          </div>
-        </div>
+        <input type="hidden" id="log-status" value="✅ 完美達標" />
+        <input type="hidden" id="log-note" value="" />
 
         <button type="button" id="add-log-btn" class="btn-primary" style="width:100%;margin-top:14px">
-          💾 儲存／更新今日打卡結算（同步至歷史紀錄）
+          💾 儲存今日打卡結算
         </button>
-      </div>
-
-      <!-- 卡片 3：🍽️ 今日已吃餐點明細（拍照/文字分析或套餐打卡會自動記錄於此） -->
-      <div class="card">
-        <div class="card-title-row">
-          <div>
-            <h2 class="card-title">🍽️ 今日已打卡飲食明細</h2>
-            <p class="pool-text" style="margin:2px 0 0">在「3. 飲食套餐」拍完餐點或選好套餐按打卡，會自動記錄到這裡並累加今日熱量</p>
-          </div>
-          <button type="button" id="go-to-ai-food-btn" class="btn-secondary" style="font-size:0.82rem;padding:7px 12px">
-            📸 去拍照/選餐點打卡
-          </button>
-        </div>
-
-        <div id="today-meals-list" class="today-meals-list"></div>
-
-        <!-- 手動快速補登一筆飲食 -->
-        <div class="manual-meal-row">
-          <input type="text" id="manual-meal-name" class="text-input" placeholder="手動補登食物（例：無糖拿鐵、茶葉蛋）" />
-          <input type="number" id="manual-meal-kcal" class="text-input manual-kcal-input" min="0" max="5000" step="10" placeholder="熱量 kcal" />
-          <button type="button" id="add-manual-meal-btn" class="btn-secondary" style="white-space:nowrap">➕ 補登飲食</button>
-        </div>
-      </div>
-
-      <!-- 卡片 4：🏃 今日運動消耗打卡 -->
-      <div class="card">
-        <div class="card-title-row">
-          <div>
-            <h2 class="card-title">🏃 今日運動消耗打卡</h2>
-            <p class="pool-text" style="margin:2px 0 0">點選下方運動按鈕或直接輸入消耗卡路里，將即時增加「今日預估還可吃熱量」</p>
-          </div>
-          <button type="button" class="btn-ghost ex-quick-btn" data-kcal="0">🧹 歸零</button>
-        </div>
-
-        <div class="preset-row" style="margin-bottom:10px">
-          <button type="button" class="preset-chip ex-quick-btn" data-kcal="130">🚶 快走30分 (+130 kcal)</button>
-          <button type="button" class="preset-chip ex-quick-btn" data-kcal="260">🏃 慢跑30分 (+260 kcal)</button>
-          <button type="button" class="preset-chip ex-quick-btn" data-kcal="220">🏋️ 重訓40分 (+220 kcal)</button>
-          <button type="button" class="preset-chip ex-quick-btn" data-kcal="240">🚴 單車/飛輪30分 (+240 kcal)</button>
-          <button type="button" class="preset-chip ex-quick-btn" data-kcal="350">🏊 游泳40分 (+350 kcal)</button>
-        </div>
-
-        <div class="field-group">
-          <label class="field-label" for="log-exercise">🔥 今日運動總消耗熱量 (kcal)</label>
-          <input type="number" id="log-exercise" class="text-input" step="10" min="0" max="4000" value="0" placeholder="0" />
-        </div>
       </div>
     </section>
 
-    <!-- ==================== 畫面 5：歷史紀錄與實測代謝能力動態校正 ==================== -->
+    <!-- ==================== 畫面 5：歷史與校正（獨立頁面） ==================== -->
     <section id="screen-history" class="screen hidden">
-      <!-- 卡片 A：歷史打卡紀錄 -->
-      <div class="card">
-        <div class="card-title-row">
-          <h2 class="card-title">🗂️ 每日歷史打卡紀錄</h2>
-          <button type="button" id="clear-logs-btn" class="btn-ghost">🗑️ 清除全部紀錄</button>
-        </div>
-        <div id="tracker-stats-summary" class="tracker-stats-summary"></div>
-        <div id="tracker-logs-list" class="tracker-logs-list"></div>
+      <div class="card compact-card" style="display:flex;justify-content:space-between;align-items:center">
+        <strong>🗂️ 歷史紀錄與實測代謝校正</strong>
+        <button type="button" id="back-to-tracker-btn" class="btn-secondary" style="font-size:0.82rem;padding:6px 12px">
+          ⬅️ 返回今日打卡
+        </button>
       </div>
 
-      <!-- 卡片 B：🧠 實測代謝能力動態校正 (Adaptive TDEE) -->
+      <!-- 卡片 A：🧠 實測代謝能力動態校正 (Adaptive TDEE) -->
       <div class="card calib-card">
         <div class="card-title-row">
           <div>
-            <h2 class="card-title">🧠 實測代謝能力動態校正 (Adaptive TDEE)</h2>
-            <p class="pool-text" style="margin:3px 0 0">執行一週後實際體重與預期不符？（例如預計瘦 1kg 卻胖 0.5kg）輸入實測結果與運動消耗，系統將自動重新校正您的真實基礎代謝與未來減重計畫！</p>
+            <h2 class="card-title">🧠 實測代謝能力動態校正</h2>
+            <p class="pool-text" style="margin:3px 0 0">若執行一週後實際體重與預期不符（如預計瘦 1kg 卻胖 0.5kg），系統可依實測結果與運動消耗重新校正您的代謝能力。</p>
           </div>
-          <button type="button" id="calib-autofill-btn" class="btn-secondary" style="font-size:0.82rem;padding:7px 12px">
+          <button type="button" id="calib-autofill-btn" class="btn-secondary" style="font-size:0.8rem;padding:6px 10px">
             📥 從歷史紀錄帶入
           </button>
         </div>
@@ -700,20 +646,19 @@
             <input type="number" id="calib-days" class="text-input" min="3" max="90" value="7" />
           </div>
           <div class="field-group">
-            <label class="field-label" for="calib-avg-exercise">🏃 期間平均每日運動消耗 (kcal)</label>
+            <label class="field-label" for="calib-avg-exercise">🏃 日均運動消耗 (kcal)</label>
             <input type="number" id="calib-avg-exercise" class="text-input" min="0" max="2000" step="10" value="0" />
           </div>
           <div class="field-group">
-            <label class="field-label" for="calib-expected-kg">📉 原預計體重變化 (kg) <span class="opt-tag">負數代表減重</span></label>
+            <label class="field-label" for="calib-expected-kg">📉 原預計體重變化 (kg)</label>
             <input type="number" id="calib-expected-kg" class="text-input" step="0.1" value="-1.0" />
           </div>
           <div class="field-group">
-            <label class="field-label" for="calib-actual-kg">⚖️ 實際體重變化 (kg) <span class="opt-tag">例如胖0.5填 0.5、瘦0.8填 -0.8</span></label>
+            <label class="field-label" for="calib-actual-kg">⚖️ 實際體重變化 (kg)</label>
             <input type="number" id="calib-actual-kg" class="text-input" step="0.1" value="0.5" />
           </div>
         </div>
 
-        <!-- 即時校正試算結果面板 -->
         <div id="calib-result-box" class="calib-result-box">
           <div class="calib-metrics-row">
             <div>
@@ -722,11 +667,11 @@
             </div>
             <div class="calib-arrow">➔</div>
             <div>
-              <span class="pool-text">實測校正後真實 TDEE</span>
+              <span class="pool-text">實測校正後 TDEE</span>
               <strong id="calib-new-tdee" class="calib-num highlight">1,540 kcal</strong>
             </div>
             <div>
-              <span class="pool-text">建議代謝能力修正值</span>
+              <span class="pool-text">建議代謝修正</span>
               <strong id="calib-offset-val" class="calib-num">-316 kcal/日</strong>
             </div>
           </div>
@@ -735,12 +680,22 @@
 
         <div class="btn-row" style="margin-top:12px">
           <button type="button" id="calib-reset-btn" class="btn-secondary">
-            ↩️ 恢復預設公式代謝
+            ↩️ 恢復預設公式
           </button>
           <button type="button" id="calib-apply-btn" class="btn-primary">
-            🔄 套用校正代謝並重算減重計畫
+            🔄 套用校正並重算
           </button>
         </div>
+      </div>
+
+      <!-- 卡片 B：歷史打卡紀錄 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">🗂️ 每日歷史打卡紀錄</h2>
+          <button type="button" id="clear-logs-btn" class="btn-ghost">🗑️ 清除全部紀錄</button>
+        </div>
+        <div id="tracker-stats-summary" class="tracker-stats-summary"></div>
+        <div id="tracker-logs-list" class="tracker-logs-list"></div>
       </div>
     </section>
 
@@ -768,6 +723,6 @@
     </footer>
   </div>
 
-  <script type="module" src="js/app.js?v=1.3.0"></script>
+  <script type="module" src="js/app.js?v=1.3.1"></script>
 </body>
 </html>

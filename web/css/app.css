@@ -87,8 +87,8 @@ body {
 
 .nav-tabs {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
   background: #e2e8f0;
   padding: 4px;
   border-radius: 10px;
@@ -99,18 +99,32 @@ body {
   background: transparent;
   color: #475569;
   font-weight: 700;
-  font-size: 0.82rem;
-  padding: 9px 4px;
+  font-size: 0.86rem;
+  padding: 9px 6px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
-  white-space: nowrap;
 }
 
 .nav-tab.active {
   background: #ffffff;
   color: var(--primary-dark);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.history-top-btn {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #334155;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  border-radius: 999px;
+}
+
+.history-top-btn.active {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+  color: #6d28d9;
 }
 
 /* 卡片通用樣式 */
@@ -1436,16 +1450,23 @@ button {
   background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 48%);
 }
 
-.today-kcal-grid {
+.today-kcal-grid,
+.today-kcal-grid-3 {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
-@media (min-width: 560px) {
-  .today-kcal-grid {
-    grid-template-columns: repeat(4, 1fr);
+@media (max-width: 420px) {
+  .today-kcal-grid-3 {
+    gap: 6px;
+  }
+  .today-kcal-grid-3 .today-kcal-box {
+    padding: 10px 6px;
+  }
+  .today-kcal-grid-3 .today-kcal-val {
+    font-size: 1.25rem;
   }
 }
 
