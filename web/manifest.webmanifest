@@ -1,0 +1,20 @@
+{
+  "name": "體重飲食管理 HealthyWeight",
+  "short_name": "飲食管理",
+  "description": "個人化體重飲食管理、168 斷食與減重套餐規劃 — 手機與電腦皆可使用",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#059669",
+  "orientation": "portrait",
+  "lang": "zh-Hant",
+  "version": "1.0.0",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

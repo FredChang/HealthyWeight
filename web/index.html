@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#059669" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="description" content="個人化體重飲食管理 App — 輸入身體素質、選擇 168 斷食等飲食法與施行時間，精算減重目標與多元外食自煮套餐" />
+  <title>體重飲食管理 HealthyWeight</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div id="loading" class="loading-overlay hidden">載入飲食資料庫中…</div>
+
+  <div class="app">
+    <!-- 頂部品牌與導覽列 -->
+    <header class="top-bar">
+      <div class="brand-row">
+        <div class="brand-logo">🥗</div>
+        <div>
+          <h1 class="brand-title">體重飲食管理 <span class="brand-sub">HealthyWeight</span></h1>
+          <p class="brand-desc">身體素質代謝精算 × 168 斷食管理 × 多元減脂套餐</p>
+        </div>
+      </div>
+
+      <nav class="nav-tabs" aria-label="功能切換">
+        <button type="button" class="nav-tab active" data-tab="setup">1. 素質與方法</button>
+        <button type="button" class="nav-tab" data-tab="result">2. 減重預測</button>
+        <button type="button" class="nav-tab" data-tab="meals">3. 飲食套餐</button>
+        <button type="button" class="nav-tab" data-tab="tracker">4. 體重打卡</button>
+      </nav>
+    </header>
+
+    <!-- ==================== 畫面 1：輸入身體素質與挑選飲食方法 ==================== -->
+    <section id="screen-setup" class="screen">
+      <!-- 快速套用範例列 -->
+      <div class="card compact-card">
+        <div class="preset-header">
+          <span class="field-label" style="margin:0">⚡ 快速載入身體素質範例（或直接於下方輸入）：</span>
+        </div>
+        <div class="preset-row">
+          <button type="button" class="preset-chip" data-preset="office-f">👩 久坐上班族女 (160cm / 62kg)</button>
+          <button type="button" class="preset-chip" data-preset="eatout-m">👨 外食工程師男 (174cm / 82kg)</button>
+          <button type="button" class="preset-chip" data-preset="fitness-u">🏋️ 運動增肌減脂 (168cm / 68kg)</button>
+        </div>
+      </div>
+
+      <!-- 卡片 A：使用者身體素質 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">📏 步驟一：輸入您的身體素質</h2>
+          <span id="live-bmi-badge" class="status-badge">BMI --</span>
+        </div>
+
+        <label class="field-label">生理性別</label>
+        <div class="toggle-row">
+          <label>
+            <input type="radio" name="gender" value="male" />
+            <span class="toggle-card">👨 男性 (Male)</span>
+          </label>
+          <label>
+            <input type="radio" name="gender" value="female" checked />
+            <span class="toggle-card">👩 女性 (Female)</span>
+          </label>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="field-group">
+            <label class="field-label" for="input-age">年齡 (歲)</label>
+            <input type="number" id="input-age" class="text-input" min="14" max="95" value="30" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="input-height">身高 (cm)</label>
+            <input type="number" id="input-height" class="text-input" min="120" max="220" step="0.5" value="162" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="input-weight">目前體重 (kg)</label>
+            <input type="number" id="input-weight" class="text-input" min="35" max="200" step="0.1" value="64.0" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="input-target-weight">期望目標體重 (kg) <span class="opt-tag">選填</span></label>
+            <input type="number" id="input-target-weight" class="text-input" min="35" max="180" step="0.1" value="56.0" placeholder="例如 56" />
+          </div>
+        </div>
+
+        <div class="form-grid-2" style="margin-top: 12px">
+          <div class="field-group">
+            <label class="field-label" for="input-bodyfat">體脂率 (%) <span class="opt-tag">選填，填寫更精準</span></label>
+            <input type="number" id="input-bodyfat" class="text-input" min="5" max="60" step="0.5" placeholder="未填則依公式推算" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="select-activity">日常活動與運動量</label>
+            <select id="select-activity" class="select-input">
+              <option value="1.2">🪑 久坐不動（辦公室工作、幾乎不運動）</option>
+              <option value="1.375" selected>🚶 輕度活動（每週運動 1~3 天或常走動）</option>
+              <option value="1.55">🏃 中度運動（每週運動 3~5 天）</option>
+              <option value="1.725">🏋️ 高度運動（每週高強度訓練 6~7 天）</option>
+              <option value="1.9">🔥 極高強度（勞力工作或每日雙倍訓練）</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡片 B：挑選飲食管理方法 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">⏱️ 步驟二：挑選飲食管理方法</h2>
+          <span class="hint-text">點擊卡片切換</span>
+        </div>
+
+        <div id="method-cards-grid" class="method-cards-grid">
+          <!-- 由 JS 動態渲染 6 大飲食法卡片 (168, 186, 211, 5:2, 低碳, 高蛋白) -->
+        </div>
+
+        <!-- 所選飲食法詳細說明與進食時間窗選擇 -->
+        <div id="method-detail-box" class="method-detail-box">
+          <div class="method-detail-header">
+            <span id="method-detail-title" class="method-detail-title">168 間歇性斷食</span>
+            <span id="method-detail-badge" class="method-badge">🔥 最受歡迎</span>
+          </div>
+          <p id="method-detail-summary" class="method-detail-summary"></p>
+
+          <div class="field-group" style="margin-top:10px">
+            <label class="field-label" for="select-eating-window">🕒 選擇每日進食時間窗 / 執行作息：</label>
+            <select id="select-eating-window" class="select-input"></select>
+          </div>
+
+          <ul id="method-tips-list" class="method-tips-list"></ul>
+        </div>
+      </div>
+
+      <!-- 卡片 C：預定施行時間與減重強度 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">📅 步驟三：預定施行時間與執行強度</h2>
+          <span id="duration-date-range" class="pool-text" style="margin:0"></span>
+        </div>
+
+        <label class="field-label" for="duration-slider">預定施行時間：<strong id="duration-label-text" class="highlight-num">8 週（約 56 天 / 2 個月）</strong></label>
+        <div class="slider-row">
+          <input type="range" id="duration-slider" min="1" max="36" value="8" step="1" />
+          <span id="duration-weeks-badge">8 週</span>
+        </div>
+
+        <div class="preset-row" style="margin-top: 10px; margin-bottom: 16px">
+          <button type="button" class="duration-chip" data-weeks="2">2 週體驗</button>
+          <button type="button" class="duration-chip" data-weeks="4">4 週 (1個月)</button>
+          <button type="button" class="duration-chip active" data-weeks="8">8 週 (2個月)</button>
+          <button type="button" class="duration-chip" data-weeks="12">12 週 (3個月)</button>
+          <button type="button" class="duration-chip" data-weeks="16">16 週 (4個月)</button>
+          <button type="button" class="duration-chip" data-weeks="24">24 週 (半年)</button>
+        </div>
+
+        <label class="field-label">執行強度（每日熱量赤字幅度）</label>
+        <div class="toggle-row toggle-row-3">
+          <label>
+            <input type="radio" name="intensity" value="gentle" />
+            <span class="toggle-card">🌱 溫和輕鬆<br /><small>赤字約 -350 kcal</small></span>
+          </label>
+          <label>
+            <input type="radio" name="intensity" value="standard" checked />
+            <span class="toggle-card">⚖️ 標準推薦<br /><small>赤字約 -500 kcal</small></span>
+          </label>
+          <label>
+            <input type="radio" name="intensity" value="aggressive" />
+            <span class="toggle-card">🔥 積極挑戰<br /><small>赤字約 -700 kcal</small></span>
+          </label>
+        </div>
+      </div>
+
+      <button type="button" id="calculate-btn" class="btn-primary btn-large">
+        🚀 立即計算減重預測與專屬飲食套餐
+      </button>
+    </section>
+
+    <!-- ==================== 畫面 2：減重數值預測與代謝分析 ==================== -->
+    <section id="screen-result" class="screen hidden">
+      <!-- 頂部核心成果英雄卡 -->
+      <div class="hero-result-card">
+        <div class="hero-top-row">
+          <span id="res-method-pill" class="hero-pill">168 間歇性斷食 · 施行 8 週</span>
+          <button type="button" id="edit-profile-btn" class="btn-ghost-light">✏️ 修改條件</button>
+        </div>
+
+        <div class="hero-main-grid">
+          <div class="hero-stat-main">
+            <span class="hero-label">預定時間預計可減重</span>
+            <div id="res-weight-loss" class="hero-big-number">-4.2 kg</div>
+            <span id="res-weight-change-text" class="hero-sub">64.0 kg ➔ 59.8 kg</span>
+          </div>
+
+          <div class="hero-stat-side">
+            <div class="hero-mini-item">
+              <span class="mini-label">BMI 體態變化</span>
+              <strong id="res-bmi-change" class="mini-val">24.4 ➔ 22.8</strong>
+            </div>
+            <div class="hero-mini-item">
+              <span class="mini-label">預計減少腰圍 / 體脂</span>
+              <strong id="res-waist-change" class="mini-val">約 -4.0 cm</strong>
+            </div>
+            <div class="hero-mini-item">
+              <span class="mini-label">距離目標體重評估</span>
+              <strong id="res-goal-eta" class="mini-val">--</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 四大關鍵代謝數據卡片 -->
+      <div class="metrics-grid-4">
+        <div class="metric-card">
+          <span class="metric-label">🔥 基礎代謝 (BMR)</span>
+          <strong id="res-bmr" class="metric-value">1,350</strong>
+          <span class="metric-unit">kcal / 日 (躺著也消耗)</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">⚡ 每日總消耗 (TDEE)</span>
+          <strong id="res-tdee" class="metric-value">1,856</strong>
+          <span class="metric-unit">kcal / 日 (維持體重)</span>
+        </div>
+        <div class="metric-card highlight">
+          <span class="metric-label">🎯 建議每日攝取</span>
+          <strong id="res-target-kcal" class="metric-value">1,380</strong>
+          <span id="res-deficit-tag" class="metric-unit">每日赤字 -476 kcal</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">💧 建議每日飲水</span>
+          <strong id="res-water" class="metric-value">2,240</strong>
+          <span id="res-water-cups" class="metric-unit">ml / 日 (約 8 杯水)</span>
+        </div>
+      </div>
+
+      <div id="res-safety-notice" class="safety-banner hidden"></div>
+
+      <!-- 24小時斷食與進食時間軸卡片 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">🕒 一日 24 小時斷食與進食作息時間軸</h2>
+          <span id="fasting-live-status" class="status-badge">目前時段狀態</span>
+        </div>
+        <p id="res-window-desc" class="pool-text" style="margin-top:0"></p>
+        <div id="timeline-bar" class="timeline-bar"></div>
+        <div class="timeline-ticks">
+          <span>00:00</span>
+          <span>06:00</span>
+          <span>12:00</span>
+          <span>18:00</span>
+          <span>24:00</span>
+        </div>
+      </div>
+
+      <!-- 三大營養素分配卡片 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">🥩 每日三大營養素 (Macros) 建議攝取目標</h2>
+          <span id="res-macro-ratio-text" class="pool-text" style="margin:0">P 30% / C 40% / F 30%</span>
+        </div>
+
+        <div class="macro-bars">
+          <div class="macro-row">
+            <div class="macro-info">
+              <span class="macro-name">🥩 蛋白質 (Protein) — 保肌燃脂關鍵</span>
+              <strong id="res-macro-p" class="macro-grams">104 g (416 kcal)</strong>
+            </div>
+            <div class="progress-track"><div id="bar-macro-p" class="progress-fill fill-p" style="width:30%"></div></div>
+          </div>
+
+          <div class="macro-row">
+            <div class="macro-info">
+              <span class="macro-name">🍠 碳水化合物 (Carbs) — 優選原型全穀</span>
+              <strong id="res-macro-c" class="macro-grams">138 g (552 kcal)</strong>
+            </div>
+            <div class="progress-track"><div id="bar-macro-c" class="progress-fill fill-c" style="width:40%"></div></div>
+          </div>
+
+          <div class="macro-row">
+            <div class="macro-info">
+              <span class="macro-name">🥑 健康脂肪 (Fat) — 荷爾蒙與飽足感</span>
+              <strong id="res-macro-f" class="macro-grams">46 g (414 kcal)</strong>
+            </div>
+            <div class="progress-track"><div id="bar-macro-f" class="progress-fill fill-f" style="width:30%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 階段性減重曲線預測圖與週次里程碑 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">📉 預定時間體重下降預測曲線</h2>
+          <span class="pool-text" style="margin:0">含初期肝醣水分排出與穩定減脂期模擬</span>
+        </div>
+        <div id="weight-chart-container" class="chart-container"></div>
+
+        <details class="milestone-details">
+          <summary>📋 展開查看逐週體重里程碑明細表</summary>
+          <div class="table-scroll">
+            <table class="milestone-table">
+              <thead>
+                <tr>
+                  <th>週次</th>
+                  <th>預計日期</th>
+                  <th>預估體重</th>
+                  <th>累計減重</th>
+                  <th>預估 BMI</th>
+                </tr>
+              </thead>
+              <tbody id="milestone-tbody"></tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" id="back-to-setup-btn" class="btn-secondary">⬅️ 重新調整條件</button>
+        <button type="button" id="go-to-meals-btn" class="btn-primary">🍱 查看推薦飲食套餐 ➡️</button>
+      </div>
+    </section>
+
+    <!-- ==================== 畫面 3：多種飲食套餐選擇與自由混搭 ==================== -->
+    <section id="screen-meals" class="screen hidden">
+      <div class="card meal-header-card">
+        <div class="meal-header-top">
+          <div>
+            <h2 class="card-title" style="margin-bottom:4px">🍱 專屬減脂飲食套餐推薦</h2>
+            <p id="meal-target-summary" class="pool-text" style="margin:0">
+              依據您的目標熱量 <strong>1,380 kcal</strong> 與 <strong>168 斷食</strong> 為您自動換算份量建議
+            </p>
+          </div>
+          <button type="button" id="random-meal-btn" class="btn-secondary">🎲 隨機換一組</button>
+        </div>
+
+        <!-- 套餐分類篩選器 -->
+        <div class="category-filter-row" id="meal-category-filters">
+          <button type="button" class="cat-chip active" data-cat="recommended">⭐ 適合此飲食法</button>
+          <button type="button" class="cat-chip" data-cat="all">全部套餐</button>
+          <button type="button" class="cat-chip" data-cat="convenience">🏪 超商外食</button>
+          <button type="button" class="cat-chip" data-cat="eatout">🍱 便當/滷味</button>
+          <button type="button" class="cat-chip" data-cat="homecook">🍳 自煮料理</button>
+          <button type="button" class="cat-chip" data-cat="veggie">🌱 蔬食高纖</button>
+        </div>
+      </div>
+
+      <!-- 套餐卡片列表 -->
+      <div id="meal-plans-list" class="meal-plans-list"></div>
+
+      <!-- 自由混搭一日餐盤計算機 -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">🔧 自訂自由混搭一日餐盤（即時算熱量）</h2>
+          <button type="button" id="clear-custom-meal-btn" class="btn-ghost">清空重選</button>
+        </div>
+        <p class="pool-text" style="margin-top:0">不吃固定套餐？點選下方常見台灣外食／超商單品，自由湊出符合您今日目標熱量的組合：</p>
+
+        <div class="custom-builder-summary">
+          <div>
+            <span>已選總熱量：</span>
+            <strong id="custom-total-kcal" class="highlight-num">0</strong>
+            <span id="custom-target-compare"> / 目標 1380 kcal</span>
+          </div>
+          <div class="custom-macro-pills">
+            <span id="custom-total-p">蛋白質 0g</span>
+            <span id="custom-total-c">碳水 0g</span>
+            <span id="custom-total-f">脂肪 0g</span>
+          </div>
+        </div>
+
+        <div class="custom-food-sections">
+          <div>
+            <h3 class="sub-heading">🥩 優質蛋白質（點擊加入 +1）</h3>
+            <div id="custom-proteins-list" class="food-chip-grid"></div>
+          </div>
+          <div>
+            <h3 class="sub-heading">🍠 複合好澱粉與水果（點擊加入 +1）</h3>
+            <div id="custom-carbs-list" class="food-chip-grid"></div>
+          </div>
+          <div>
+            <h3 class="sub-heading">🥗 蔬菜、高纖與好油脂（點擊加入 +1）</h3>
+            <div id="custom-veggies-list" class="food-chip-grid"></div>
+          </div>
+        </div>
+
+        <div id="custom-selected-tray" class="custom-selected-tray hidden">
+          <div class="tray-title">🍽️ 目前餐盤已選清單（點擊項目可移除）：</div>
+          <div id="custom-tray-items" class="tray-items"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 畫面 4：每日體重與飲食打卡追蹤 ==================== -->
+    <section id="screen-tracker" class="screen hidden">
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">📊 每日體重與飲食執行打卡</h2>
+          <span class="pool-text" style="margin:0">資料自動保存在此裝置瀏覽器</span>
+        </div>
+
+        <div class="form-grid-3">
+          <div class="field-group">
+            <label class="field-label" for="log-date">日期</label>
+            <input type="date" id="log-date" class="text-input" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="log-weight">當日體重 (kg)</label>
+            <input type="number" id="log-weight" class="text-input" step="0.1" min="30" max="200" placeholder="例如 63.5" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="log-status">飲食/斷食執行狀況</label>
+            <select id="log-status" class="select-input">
+              <option value="✅ 完美達標">✅ 完美達標（完成斷食與控卡）</option>
+              <option value="👍 大致達標">👍 大致達標（微幅超標但健康）</option>
+              <option value="🎉 聚餐彈性日">🎉 聚餐彈性日（開心聚餐明日繼續）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group" style="margin-top:10px">
+          <label class="field-label" for="log-note">飲食備忘 / 今日吃了哪套菜單（選填）</label>
+          <input type="text" id="log-note" class="text-input" placeholder="例如：168超商套餐A、喝水 2500ml、快走30分鐘" />
+        </div>
+
+        <button type="button" id="add-log-btn" class="btn-primary" style="width:100%;margin-top:12px">
+          ➕ 儲存今日體重與飲食紀錄
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">🗂️ 歷史打卡紀錄</h2>
+          <button type="button" id="clear-logs-btn" class="btn-ghost">🗑️ 清除全部紀錄</button>
+        </div>
+        <div id="tracker-stats-summary" class="tracker-stats-summary"></div>
+        <div id="tracker-logs-list" class="tracker-logs-list"></div>
+      </div>
+    </section>
+
+    <!-- 採買清單彈窗 Modal -->
+    <div id="shopping-modal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="modal-plan-title" style="margin:0">🛒 套餐採買與外食準備清單</h3>
+          <button type="button" id="modal-close-btn" class="btn-ghost">✕</button>
+        </div>
+        <p class="pool-text">勾選您已準備好的食材，或點擊下方按鈕複製到手機備忘錄／LINE：</p>
+        <ul id="modal-shopping-list" class="shopping-checklist"></ul>
+        <div class="btn-row">
+          <button type="button" id="copy-shopping-btn" class="btn-primary">📋 複製採買清單文字</button>
+          <button type="button" id="modal-ok-btn" class="btn-secondary">關閉</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <p class="install-hint">
+        📱 <strong>手機當成 App 使用</strong>：iPhone (Safari 分享 → 加入主畫面) ／ Android (Chrome 選單 → 安裝應用程式)
+      </p>
+      <p id="app-version" class="app-version"></p>
+    </footer>
+  </div>
+
+  <script type="module" src="js/app.js?v=1.0.0"></script>
+</body>
+</html>
