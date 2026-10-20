@@ -24,8 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Sync diet plans to web
-        run: cp diet-plans.json web/diet-plans.json
+      - name: Prepare Pages site (support both / and /web/ paths)
+        run: |
+          cp diet-plans.json web/diet-plans.json
+          mkdir -p _site/web
+          cp -r web/. _site/
+          cp -r web/. _site/web/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -33,7 +37,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
