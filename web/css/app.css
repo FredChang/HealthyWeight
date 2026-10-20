@@ -49,34 +49,48 @@ body {
 .brand-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: nowrap;
+}
+
+.brand-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .brand-logo {
-  width: 46px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
   border-radius: 12px;
   background: linear-gradient(135deg, #10b981, #059669);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   box-shadow: 0 4px 10px rgba(5, 150, 105, 0.2);
 }
 
 .brand-title {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
+  white-space: nowrap;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 }
 
 .brand-sub {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--primary);
-  margin-left: 4px;
+  white-space: nowrap;
 }
 
 .brand-desc {
@@ -99,11 +113,16 @@ body {
   background: transparent;
   color: #475569;
   font-weight: 700;
-  font-size: 0.86rem;
-  padding: 9px 6px;
+  font-size: 0.88rem;
+  padding: 9px 4px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .nav-tab.active {
@@ -119,12 +138,40 @@ body {
   padding: 7px 12px;
   font-size: 0.82rem;
   border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .history-top-btn.active {
   background: #f5f3ff;
   border-color: #8b5cf6;
   color: #6d28d9;
+}
+
+@media (max-width: 440px) {
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    font-size: 1.2rem;
+  }
+  .brand-title {
+    font-size: 1.1rem;
+    gap: 4px;
+  }
+  .brand-sub {
+    font-size: 0.76rem;
+  }
+  .history-top-btn {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+  .nav-tabs {
+    gap: 4px;
+  }
+  .nav-tab {
+    font-size: 0.82rem;
+    padding: 8px 2px;
+  }
 }
 
 /* 卡片通用樣式 */

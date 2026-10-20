@@ -5,7 +5,7 @@ import {
   evaluateMetabolicCalibration,
   getPortionAdjustmentAdvice,
   formatDateShort
-} from './calculator.js?v=1.3.2';
+} from './calculator.js?v=1.3.3';
 import {
   compressImageFile,
   captureVideoFrame,
@@ -14,8 +14,8 @@ import {
   hasCustomApiKey,
   loadAiFoodHistory,
   saveAiFoodHistoryItem
-} from './ai-food.js?v=1.3.2';
-import { APP_VERSION } from './version.js?v=1.3.2';
+} from './ai-food.js?v=1.3.3';
+import { APP_VERSION } from './version.js?v=1.3.3';
 
 const STORAGE_KEYS = {
   PROFILE: 'hw_user_profile_v1',
@@ -1799,7 +1799,7 @@ async function init() {
       }
     });
     navigator.serviceWorker
-      .register('./sw.js?v=1.3.2', { updateViaCache: 'none' })
+      .register('./sw.js?v=1.3.3', { updateViaCache: 'none' })
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
   }
