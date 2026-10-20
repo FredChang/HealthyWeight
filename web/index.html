@@ -338,11 +338,21 @@
 
         <div class="ai-upload-row">
           <button type="button" id="ai-camera-btn" class="btn-primary ai-upload-btn">
-            📷 拍照辨識餐點
+            📷 開啟相機拍照
           </button>
           <button type="button" id="ai-gallery-btn" class="btn-secondary ai-upload-btn">
             🖼️ 從相簿選照片
           </button>
+        </div>
+
+        <!-- 即時相機觀景窗 (WebRTC getUserMedia) -->
+        <div id="ai-camera-live-wrap" class="ai-camera-live-wrap hidden">
+          <video id="ai-camera-video" autoplay playsinline muted></video>
+          <div class="ai-camera-controls">
+            <button type="button" id="ai-switch-cam-btn" class="btn-secondary ai-cam-ctrl-btn">🔄 切換鏡頭</button>
+            <button type="button" id="ai-snap-btn" class="btn-primary ai-cam-snap-btn">📸 拍下餐點</button>
+            <button type="button" id="ai-close-cam-btn" class="btn-secondary ai-cam-ctrl-btn">✕ 關閉</button>
+          </div>
         </div>
 
         <!-- 照片預覽區 -->
@@ -591,6 +601,6 @@
     </footer>
   </div>
 
-  <script type="module" src="js/app.js?v=1.1.0"></script>
+  <script type="module" src="js/app.js?v=1.1.1"></script>
 </body>
 </html>

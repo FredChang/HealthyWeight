@@ -1,4 +1,4 @@
-const CACHE = 'healthyweight-v1.1.0';
+const CACHE = 'healthyweight-v1.1.1';
 
 const PRECACHE_ASSETS = [
   './',

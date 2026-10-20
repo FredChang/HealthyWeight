@@ -92,6 +92,37 @@ export function compressImageFile(file, maxEdge = 1024, quality = 0.82) {
 }
 
 /**
+ * 從即時相機 <video> 畫面擷取影格並壓縮為 JPEG
+ */
+export function captureVideoFrame(videoEl, maxEdge = 1024, quality = 0.85) {
+  let width = videoEl.videoWidth || 640;
+  let height = videoEl.videoHeight || 480;
+  if (width > maxEdge || height > maxEdge) {
+    if (width >= height) {
+      height = Math.round((height * maxEdge) / width);
+      width = maxEdge;
+    } else {
+      width = Math.round((width * maxEdge) / height);
+      height = maxEdge;
+    }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(videoEl, 0, 0, width, height);
+  const dataUrl = canvas.toDataURL('image/jpeg', quality);
+  const base64Data = dataUrl.split(',')[1];
+  return {
+    dataUrl,
+    base64Data,
+    mimeType: 'image/jpeg',
+    width,
+    height
+  };
+}
+
+/**
  * 呼叫 Gemini 多模態視覺模型分析餐點照片與文字描述
  */
 export async function analyzeFoodWithAi({ imageBase64, mimeType, userNote, dietContext }) {

@@ -7,6 +7,7 @@ import {
 } from './calculator.js';
 import {
   compressImageFile,
+  captureVideoFrame,
   analyzeFoodWithAi,
   setCustomApiKey,
   hasCustomApiKey,
@@ -30,6 +31,8 @@ let customTray = [];
 let currentModalShoppingText = '';
 let currentAiImage = null;
 let lastAiAnalysis = null;
+let cameraStream = null;
+let cameraFacingMode = 'environment';
 
 const screens = {
   setup: document.getElementById('screen-setup'),
@@ -93,6 +96,11 @@ const els = {
   aiGalleryInput: document.getElementById('ai-gallery-input'),
   aiCameraBtn: document.getElementById('ai-camera-btn'),
   aiGalleryBtn: document.getElementById('ai-gallery-btn'),
+  aiCameraLiveWrap: document.getElementById('ai-camera-live-wrap'),
+  aiCameraVideo: document.getElementById('ai-camera-video'),
+  aiSwitchCamBtn: document.getElementById('ai-switch-cam-btn'),
+  aiSnapBtn: document.getElementById('ai-snap-btn'),
+  aiCloseCamBtn: document.getElementById('ai-close-cam-btn'),
   aiImagePreviewWrap: document.getElementById('ai-image-preview-wrap'),
   aiImagePreview: document.getElementById('ai-image-preview'),
   aiRemoveImageBtn: document.getElementById('ai-remove-image-btn'),
@@ -666,8 +674,67 @@ function updateCustomMealSummary() {
 }
 
 /* ==================== 📸 AI 拍照算卡路里與外食分析 ==================== */
+function stopLiveCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((track) => track.stop());
+    cameraStream = null;
+  }
+  if (els.aiCameraVideo) {
+    els.aiCameraVideo.srcObject = null;
+  }
+  els.aiCameraLiveWrap?.classList.add('hidden');
+}
+
+async function openLiveCamera() {
+  els.aiErrorBox?.classList.add('hidden');
+  stopLiveCamera();
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    els.aiCameraInput?.click();
+    return;
+  }
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: cameraFacingMode },
+        width: { ideal: 1280 },
+        height: { ideal: 960 }
+      },
+      audio: false
+    });
+    if (els.aiCameraVideo) {
+      els.aiCameraVideo.srcObject = cameraStream;
+      await els.aiCameraVideo.play().catch(() => {});
+    }
+    els.aiImagePreviewWrap?.classList.add('hidden');
+    els.aiCameraLiveWrap?.classList.remove('hidden');
+  } catch (err) {
+    // 若使用者裝置不支援或拒絕權限，退回原生相機 input
+    els.aiCameraInput?.click();
+  }
+}
+
+async function switchLiveCamera() {
+  cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+  await openLiveCamera();
+}
+
+function snapLiveCameraPhoto() {
+  if (!els.aiCameraVideo || !cameraStream) return;
+  const captured = captureVideoFrame(els.aiCameraVideo);
+  stopLiveCamera();
+  currentAiImage = captured;
+  if (els.aiImagePreview) {
+    els.aiImagePreview.src = captured.dataUrl;
+  }
+  els.aiImagePreviewWrap?.classList.remove('hidden');
+  runAiFoodAnalysis();
+}
+
 async function handleAiImageSelect(file) {
   if (!file) return;
+  stopLiveCamera();
   els.aiErrorBox?.classList.add('hidden');
   try {
     const compressed = await compressImageFile(file);
@@ -753,7 +820,7 @@ async function runAiFoodAnalysis() {
   const userNote = els.aiFoodNote?.value.trim() || '';
   if (!currentAiImage && !userNote) {
     if (els.aiErrorBox) {
-      els.aiErrorBox.textContent = '📸 請先「拍照／選取餐點照片」，或在文字框輸入外食菜色（例如：排骨便當飯吃一半）！';
+      els.aiErrorBox.textContent = '📸 請先「開啟相機拍照／選取餐點照片」，或在文字框輸入外食菜色（例如：排骨便當飯吃一半）！';
       els.aiErrorBox.classList.remove('hidden');
     }
     return;
@@ -857,6 +924,7 @@ function bindEvents() {
   navTabs.forEach((btn) => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
+      if (tab !== 'meals') stopLiveCamera();
       if ((tab === 'result' || tab === 'meals') && !lastCalculation) {
         runCalculation(false);
       }
@@ -893,8 +961,14 @@ function bindEvents() {
   });
 
   // AI 拍照與外食分析事件綁定
-  els.aiCameraBtn?.addEventListener('click', () => els.aiCameraInput?.click());
-  els.aiGalleryBtn?.addEventListener('click', () => els.aiGalleryInput?.click());
+  els.aiCameraBtn?.addEventListener('click', () => openLiveCamera());
+  els.aiSwitchCamBtn?.addEventListener('click', () => switchLiveCamera());
+  els.aiSnapBtn?.addEventListener('click', () => snapLiveCameraPhoto());
+  els.aiCloseCamBtn?.addEventListener('click', () => stopLiveCamera());
+  els.aiGalleryBtn?.addEventListener('click', () => {
+    stopLiveCamera();
+    els.aiGalleryInput?.click();
+  });
 
   els.aiCameraInput?.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
