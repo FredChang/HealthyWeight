@@ -1374,3 +1374,57 @@ button {
   background: var(--primary-light);
 }
 
+/* ==================== 🧠 實測代謝能力動態校正 (Adaptive TDEE) ==================== */
+.calib-card {
+  border: 2px solid #8b5cf6;
+  background: linear-gradient(180deg, #f5f3ff 0%, #ffffff 42%);
+}
+
+.calib-result-box {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1.5px solid #c4b5fd;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.08);
+}
+
+.calib-metrics-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #ddd6fe;
+  margin-bottom: 10px;
+}
+
+.calib-num {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-top: 2px;
+}
+
+.calib-num.highlight {
+  color: #6d28d9;
+}
+
+.calib-arrow {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #8b5cf6;
+}
+
+.calib-diagnosis {
+  font-size: 0.85rem;
+  color: #334155;
+  line-height: 1.55;
+}
+
+.calib-notice-banner {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #4c1d95;
+}

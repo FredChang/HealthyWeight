@@ -2,9 +2,10 @@ import {
   calculateBmi,
   getBmiCategory,
   calculateWeightPlan,
+  evaluateMetabolicCalibration,
   getPortionAdjustmentAdvice,
   formatDateShort
-} from './calculator.js';
+} from './calculator.js?v=1.2.0';
 import {
   compressImageFile,
   captureVideoFrame,
@@ -13,8 +14,8 @@ import {
   hasCustomApiKey,
   loadAiFoodHistory,
   saveAiFoodHistoryItem
-} from './ai-food.js?v=1.1.5';
-import { APP_VERSION } from './version.js?v=1.1.5';
+} from './ai-food.js?v=1.2.0';
+import { APP_VERSION } from './version.js?v=1.2.0';
 
 const STORAGE_KEYS = {
   PROFILE: 'hw_user_profile_v1',
@@ -33,6 +34,8 @@ let currentAiImage = null;
 let lastAiAnalysis = null;
 let cameraStream = null;
 let cameraFacingMode = 'environment';
+let metabolicOffsetKcal = 0;
+let dailyExerciseKcal = 0;
 
 const screens = {
   setup: document.getElementById('screen-setup'),
@@ -78,6 +81,7 @@ const els = {
   resWater: document.getElementById('res-water'),
   resWaterCups: document.getElementById('res-water-cups'),
   resSafetyNotice: document.getElementById('res-safety-notice'),
+  resCalibrationNotice: document.getElementById('res-calibration-notice'),
   fastingLiveStatus: document.getElementById('fasting-live-status'),
   resWindowDesc: document.getElementById('res-window-desc'),
   timelineBar: document.getElementById('timeline-bar'),
@@ -143,15 +147,29 @@ const els = {
   customTrayItems: document.getElementById('custom-tray-items'),
   clearCustomMealBtn: document.getElementById('clear-custom-meal-btn'),
 
-  // Tracker screen
+  // Tracker screen & Metabolic Calibration
   logDate: document.getElementById('log-date'),
   logWeight: document.getElementById('log-weight'),
+  logExercise: document.getElementById('log-exercise'),
   logStatus: document.getElementById('log-status'),
   logNote: document.getElementById('log-note'),
   addLogBtn: document.getElementById('add-log-btn'),
   clearLogsBtn: document.getElementById('clear-logs-btn'),
   trackerStatsSummary: document.getElementById('tracker-stats-summary'),
   trackerLogsList: document.getElementById('tracker-logs-list'),
+
+  calibStatusBadge: document.getElementById('calib-status-badge'),
+  calibDays: document.getElementById('calib-days'),
+  calibAvgExercise: document.getElementById('calib-avg-exercise'),
+  calibExpectedKg: document.getElementById('calib-expected-kg'),
+  calibActualKg: document.getElementById('calib-actual-kg'),
+  calibAutofillBtn: document.getElementById('calib-autofill-btn'),
+  calibResetBtn: document.getElementById('calib-reset-btn'),
+  calibApplyBtn: document.getElementById('calib-apply-btn'),
+  calibOldTdee: document.getElementById('calib-old-tdee'),
+  calibNewTdee: document.getElementById('calib-new-tdee'),
+  calibOffsetVal: document.getElementById('calib-offset-val'),
+  calibDiagnosisText: document.getElementById('calib-diagnosis-text'),
 
   // Modal
   shoppingModal: document.getElementById('shopping-modal'),
@@ -209,7 +227,9 @@ function readProfileFromInputs() {
     durationWeeks,
     intensity,
     methodId: selectedMethodId,
-    windowId: els.selectEatingWindow.value || selectedWindowId
+    windowId: els.selectEatingWindow.value || selectedWindowId,
+    metabolicOffsetKcal,
+    dailyExerciseKcal
   };
 }
 
@@ -243,6 +263,8 @@ function loadProfileFromStorage() {
     }
     if (saved.methodId) selectedMethodId = saved.methodId;
     if (saved.windowId) selectedWindowId = saved.windowId;
+    if (typeof saved.metabolicOffsetKcal === 'number') metabolicOffsetKcal = saved.metabolicOffsetKcal;
+    if (typeof saved.dailyExerciseKcal === 'number') dailyExerciseKcal = saved.dailyExerciseKcal;
   } catch {
     // ignore
   }
@@ -456,6 +478,23 @@ function runCalculation(navigateToResult = false) {
     els.resSafetyNotice.classList.add('hidden');
   }
 
+  if (els.resCalibrationNotice) {
+    if (calc.metabolicOffsetKcal !== 0 || calc.dailyExerciseKcal > 0) {
+      els.resCalibrationNotice.classList.remove('hidden');
+      const offsetStr =
+        calc.metabolicOffsetKcal > 0
+          ? `+${calc.metabolicOffsetKcal} kcal/日`
+          : `${calc.metabolicOffsetKcal} kcal/日`;
+      const exStr =
+        calc.dailyExerciseKcal > 0
+          ? ` · 運動消耗加成 <strong>+${calc.dailyExerciseKcal} kcal/日</strong>`
+          : '';
+      els.resCalibrationNotice.innerHTML = `🧠 <strong>已套用實測代謝動態校正 (Adaptive TDEE)</strong>：理論公式 TDEE 為 <strong>${calc.formulaTdee} kcal</strong>，經實測代謝修正 (<strong>${offsetStr}</strong>)${exStr} 後，目前每日總消耗 TDEE 為 <strong>${calc.tdee} kcal</strong>，每日建議攝取已精準校正為 <strong>${calc.targetCalories} kcal</strong>。`;
+    } else {
+      els.resCalibrationNotice.classList.add('hidden');
+    }
+  }
+
   renderTimeline(method, windowObj);
 
   // Macros
@@ -484,9 +523,10 @@ function runCalculation(navigateToResult = false) {
     )
     .join('');
 
-  // 更新套餐頁面資訊
+  // 更新套餐頁面資訊與代謝校正預覽
   renderMealPlans();
   updateCustomMealSummary();
+  updateCalibrationPreview();
 
   if (navigateToResult) {
     switchTab('result');
@@ -883,7 +923,7 @@ function renderTrackerLogs() {
   els.trackerLogsList.innerHTML = '';
 
   if (logs.length === 0) {
-    els.trackerStatsSummary.innerHTML = `<span class="pool-text">尚無打卡紀錄。現在就輸入今日體重開始第一筆紀錄吧！</span>`;
+    els.trackerStatsSummary.innerHTML = `<span class="pool-text">尚無打卡紀錄。現在就輸入今日體重與運動消耗開始第一筆紀錄吧！</span>`;
     return;
   }
 
@@ -891,20 +931,25 @@ function renderTrackerLogs() {
   const oldest = logs[logs.length - 1];
   const diff = +(latest.weight - oldest.weight).toFixed(1);
   const diffText = diff <= 0 ? `${diff} kg` : `+${diff} kg`;
+  const totalExercise = logs.reduce((acc, item) => acc + (Number(item.exerciseKcal) || 0), 0);
+  const avgExercise = Math.round(totalExercise / logs.length);
 
   els.trackerStatsSummary.innerHTML = `
     <span class="status-badge">累計打卡：${logs.length} 天</span>
     <span class="status-badge">最新體重：${latest.weight} kg</span>
     <span class="status-badge">期間變化：${diffText}</span>
+    <span class="status-badge">累計運動消耗：🔥 ${totalExercise} kcal (日均 ${avgExercise} kcal)</span>
   `;
 
   logs.forEach((item, idx) => {
+    const exKcal = Number(item.exerciseKcal) || 0;
     const row = document.createElement('div');
     row.className = 'tracker-log-item';
     row.innerHTML = `
       <div>
         <strong>${item.date}</strong> · <span class="highlight-num">${item.weight} kg</span>
         <span class="plan-tag" style="margin-left:6px">${item.status}</span>
+        ${exKcal > 0 ? `<span class="plan-tag" style="margin-left:6px;background:#fef3c7;color:#92400e">🏃 運動 -${exKcal} kcal</span>` : ''}
         ${item.note ? `<div class="pool-text" style="margin-top:4px">${item.note}</div>` : ''}
       </div>
       <button type="button" class="btn-ghost" data-del-idx="${idx}">刪除</button>
@@ -919,6 +964,87 @@ function renderTrackerLogs() {
   });
 }
 
+function updateCalibrationPreview() {
+  if (!els.calibOldTdee) return;
+  const formulaTdee = lastCalculation?.calc?.formulaTdee || 1800;
+  const days = Math.max(3, Math.min(90, parseInt(els.calibDays?.value, 10) || 7));
+  const avgExerciseKcal = Math.max(0, parseInt(els.calibAvgExercise?.value, 10) || 0);
+  const expectedChangeKg = parseFloat(els.calibExpectedKg?.value);
+  const actualChangeKg = parseFloat(els.calibActualKg?.value);
+
+  const evalRes = evaluateMetabolicCalibration({
+    days,
+    expectedChangeKg: isNaN(expectedChangeKg) ? -1.0 : expectedChangeKg,
+    actualChangeKg: isNaN(actualChangeKg) ? 0.5 : actualChangeKg,
+    avgExerciseKcal,
+    formulaTdee
+  });
+
+  els.calibOldTdee.textContent = `${formulaTdee} kcal`;
+  els.calibNewTdee.textContent = `${evalRes.calibratedTdee} kcal`;
+  const offsetSign = evalRes.recommendedOffsetKcal > 0 ? '+' : '';
+  els.calibOffsetVal.textContent = `${offsetSign}${evalRes.recommendedOffsetKcal} kcal/日`;
+  els.calibOffsetVal.style.color =
+    evalRes.recommendedOffsetKcal < 0 ? '#dc2626' : evalRes.recommendedOffsetKcal > 0 ? '#059669' : '#1e293b';
+
+  if (els.calibStatusBadge) {
+    if (metabolicOffsetKcal !== 0 || dailyExerciseKcal > 0) {
+      const curSign = metabolicOffsetKcal > 0 ? '+' : '';
+      els.calibStatusBadge.textContent = `已校正 (${curSign}${metabolicOffsetKcal} kcal)`;
+      els.calibStatusBadge.style.color = '#6d28d9';
+    } else {
+      els.calibStatusBadge.textContent = '目前使用標準公式';
+      els.calibStatusBadge.style.color = '';
+    }
+  }
+
+  let diagHtml = '';
+  if (evalRes.weightGapKg > 0.2) {
+    diagHtml = `💡 <strong>代謝能力診斷報告</strong>：您在 ${days} 天內的實際體重比原預期高出 <strong>+${evalRes.weightGapKg} kg</strong>（加上日均運動消耗 <strong>${avgExerciseKcal} kcal</strong> 後，推算真實每日熱量落差達 <strong>${evalRes.rawDailyGapKcal} kcal</strong>）。<br/>這代表原公式高估了您的基礎代謝，或短期內有外食隱藏油脂與鈉水滯留（已自動濾除短期水分干擾係數 ${Math.round(evalRes.dampingFactor * 100)}%）。系統建議將您的基礎代謝能力下修 <strong>${evalRes.recommendedOffsetKcal} kcal/日</strong>（校正後真實 TDEE 為 <strong>${evalRes.calibratedTdee} kcal</strong>），點擊下方按鈕即可重新精算每日目標熱量與後續減重曲線！`;
+  } else if (evalRes.weightGapKg < -0.2) {
+    diagHtml = `🔥 <strong>代謝能力診斷報告</strong>：太棒了！您在 ${days} 天內的減重進度比預期多減了 <strong>${Math.abs(evalRes.weightGapKg)} kg</strong>！這顯示您的真實代謝能力與日常活動消耗比公式預估更高。系統建議將您的代謝能力上調 <strong>+${evalRes.recommendedOffsetKcal} kcal/日</strong>（校正後真實 TDEE 為 <strong>${evalRes.calibratedTdee} kcal</strong>），讓飲食更有彈性且不易復胖！`;
+  } else {
+    diagHtml = `✅ <strong>代謝能力診斷報告</strong>：您的實際體重變化與理論公式預測非常吻合（誤差僅 ${evalRes.weightGapKg} kg），代表目前的代謝計算非常精準！若您有固定運動習慣（日均 ${avgExerciseKcal} kcal），也可點擊下方套用將運動消耗納入每日熱量配額。`;
+  }
+  if (els.calibDiagnosisText) {
+    els.calibDiagnosisText.innerHTML = diagHtml;
+  }
+
+  return evalRes;
+}
+
+function autofillCalibrationFromLogs() {
+  const logs = loadLogs();
+  if (logs.length === 0) {
+    alert('目前尚無打卡紀錄！您可直接手動輸入上方欄位（例如：執行 7 天、預計 -1.0 kg、實際 +0.5 kg），或先新增體重打卡。');
+    return;
+  }
+
+  const latest = logs[0];
+  const oldest = logs[logs.length - 1];
+  const d1 = new Date(oldest.date);
+  const d2 = new Date(latest.date);
+  const diffDays = Math.max(3, Math.round(Math.abs(d2 - d1) / (1000 * 3600 * 24)) || logs.length);
+
+  const startW = logs.length >= 2 ? oldest.weight : parseFloat(els.inputWeight.value) || latest.weight;
+  const actualDiffKg = +(latest.weight - startW).toFixed(1);
+  const totalEx = logs.reduce((acc, item) => acc + (Number(item.exerciseKcal) || 0), 0);
+  const avgEx = Math.round(totalEx / logs.length);
+
+  // 依據目前計畫推算該天數原本預計減少的公斤數
+  const weeklyLoss =
+    lastCalculation?.calc?.milestones?.[1]?.totalLost ||
+    +(lastCalculation?.calc?.totalWeightLoss / (lastCalculation?.profile?.durationWeeks || 8) || 0.6).toFixed(2);
+  const expectedDiffKg = +(-weeklyLoss * (diffDays / 7)).toFixed(1);
+
+  if (els.calibDays) els.calibDays.value = diffDays;
+  if (els.calibAvgExercise) els.calibAvgExercise.value = avgEx;
+  if (els.calibExpectedKg) els.calibExpectedKg.value = expectedDiffKg;
+  if (els.calibActualKg) els.calibActualKg.value = actualDiffKg;
+
+  updateCalibrationPreview();
+}
+
 function bindEvents() {
   // 導覽切換
   navTabs.forEach((btn) => {
@@ -927,6 +1053,9 @@ function bindEvents() {
       if (tab !== 'meals') stopLiveCamera();
       if ((tab === 'result' || tab === 'meals') && !lastCalculation) {
         runCalculation(false);
+      }
+      if (tab === 'tracker') {
+        updateCalibrationPreview();
       }
       switchTab(tab);
     });
@@ -1084,9 +1213,22 @@ function bindEvents() {
     }
   });
 
-  // 體重打卡
+  // 體重打卡與運動消耗快速按鈕
   const todayIso = new Date().toISOString().slice(0, 10);
   if (els.logDate) els.logDate.value = todayIso;
+
+  document.querySelectorAll('.ex-quick-btn').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      if (!els.logExercise) return;
+      const addKcal = parseInt(chip.dataset.kcal, 10) || 0;
+      if (addKcal === 0) {
+        els.logExercise.value = '0';
+      } else {
+        const cur = parseInt(els.logExercise.value, 10) || 0;
+        els.logExercise.value = String(cur + addKcal);
+      }
+    });
+  });
 
   els.addLogBtn?.addEventListener('click', () => {
     const date = els.logDate.value || todayIso;
@@ -1095,13 +1237,15 @@ function bindEvents() {
       alert('請輸入有效的體重數值 (kg)');
       return;
     }
+    const exerciseKcal = Math.max(0, parseInt(els.logExercise?.value, 10) || 0);
     const status = els.logStatus.value;
     const note = els.logNote.value.trim();
 
     const logs = loadLogs();
-    logs.unshift({ date, weight: +weight.toFixed(1), status, note });
+    logs.unshift({ date, weight: +weight.toFixed(1), exerciseKcal, status, note });
     saveLogs(logs);
     els.logNote.value = '';
+    if (els.logExercise) els.logExercise.value = '0';
     renderTrackerLogs();
   });
 
@@ -1110,6 +1254,44 @@ function bindEvents() {
       saveLogs([]);
       renderTrackerLogs();
     }
+  });
+
+  // 實測代謝能力動態校正 (Adaptive TDEE) 事件綁定
+  [els.calibDays, els.calibAvgExercise, els.calibExpectedKg, els.calibActualKg].forEach((input) => {
+    input?.addEventListener('input', () => {
+      updateCalibrationPreview();
+    });
+  });
+
+  els.calibAutofillBtn?.addEventListener('click', () => {
+    autofillCalibrationFromLogs();
+  });
+
+  els.calibResetBtn?.addEventListener('click', () => {
+    metabolicOffsetKcal = 0;
+    dailyExerciseKcal = 0;
+    runCalculation(false);
+    updateCalibrationPreview();
+  });
+
+  els.calibApplyBtn?.addEventListener('click', () => {
+    const evalRes = updateCalibrationPreview();
+    if (!evalRes) return;
+    metabolicOffsetKcal = evalRes.recommendedOffsetKcal;
+    dailyExerciseKcal = Math.max(0, parseInt(els.calibAvgExercise?.value, 10) || 0);
+
+    // 若使用者實際體重有增減，同步更新目前體重起點讓後續預測更準確
+    const actualChange = parseFloat(els.calibActualKg?.value);
+    const logs = loadLogs();
+    if (logs.length > 0 && logs[0].weight) {
+      els.inputWeight.value = logs[0].weight;
+    } else if (!isNaN(actualChange) && actualChange !== 0) {
+      const curW = parseFloat(els.inputWeight.value) || 64;
+      els.inputWeight.value = +(curW + actualChange).toFixed(1);
+    }
+
+    updateLiveBmiBadge();
+    runCalculation(true);
   });
 }
 
@@ -1147,7 +1329,7 @@ async function init() {
       }
     });
     navigator.serviceWorker
-      .register('./sw.js?v=1.1.5', { updateViaCache: 'none' })
+      .register('./sw.js?v=1.2.0', { updateViaCache: 'none' })
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
   }

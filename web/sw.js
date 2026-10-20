@@ -1,56 +1,36 @@
-const CACHE = 'healthyweight-v1.1.5';
-
-const PRECACHE_ASSETS = [
+const CACHE = 'healthyweight-v1.2.0';
+const ASSETS = [
   './',
   './index.html',
+  './manifest.webmanifest',
+  './icon.svg',
+  './diet-plans.json',
   './css/app.css',
   './js/app.js',
   './js/calculator.js',
   './js/ai-food.js',
-  './js/version.js',
-  './diet-plans.json',
-  './manifest.webmanifest',
-  './icon.svg'
+  './js/version.js'
 ];
 
-function isSameOrigin(request) {
-  try {
-    return new URL(request.url).origin === self.location.origin;
-  } catch {
-    return false;
-  }
-}
-
-async function networkFirst(request) {
-  const cache = await caches.open(CACHE);
-  try {
-    const response = await fetch(request, { cache: 'no-cache' });
-    if (response && response.status === 200) {
-      await cache.put(request, response.clone());
-      return response;
-    }
-    const cached = await cache.match(request);
-    return cached || response;
-  } catch {
-    const cached = await cache.match(request);
-    return cached || Response.error();
-  }
-}
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    (async () => {
-      const cache = await caches.open(CACHE);
-      await Promise.allSettled(
-        PRECACHE_ASSETS.map((asset) => cache.add(new Request(asset, { cache: 'no-cache' })).catch(() => {}))
-      );
-      await self.skipWaiting();
-    })()
+self.addEventListener('install', (e) => {
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) =>
+        Promise.all(
+          ASSETS.map((url) =>
+            fetch(new Request(url, { cache: 'no-cache' })).then((res) => {
+              if (res.ok) return c.put(url, res);
+            })
+          )
+        )
+      )
+      .then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
@@ -58,8 +38,18 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  if (!isSameOrigin(event.request)) return;
-  event.respondWith(networkFirst(event.request));
+self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  e.respondWith(
+    fetch(e.request, { cache: 'no-cache' })
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });

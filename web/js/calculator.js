@@ -1,5 +1,5 @@
 /**
- * 體重與飲食管理核心計算模組 (BMR / TDEE / 減重預測 / 營養素分配 / 份量換算)
+ * 體重與飲食管理核心計算模組 (BMR / TDEE / 動態代謝校正 Adaptive TDEE / 減重預測 / 營養素分配)
  */
 
 export function calculateBmi(weightKg, heightCm) {
@@ -30,13 +30,29 @@ export function calculateBmr({ gender, age, heightCm, weightKg, bodyFatPct }) {
 }
 
 /**
- * 綜合身體素質、飲食管理方法與預定施行週數，計算減重預測與營養目標
+ * 綜合身體素質、飲食管理方法、預定施行週數與個人代謝校正值，計算減重預測與營養目標
  */
 export function calculateWeightPlan(profile, method, durationWeeks, intensity = 'standard') {
-  const { gender, age, heightCm, weightKg, targetWeightKg, bodyFatPct, activityMultiplier } = profile;
+  const {
+    gender,
+    age,
+    heightCm,
+    weightKg,
+    targetWeightKg,
+    bodyFatPct,
+    activityMultiplier,
+    metabolicOffsetKcal = 0,
+    dailyExerciseKcal = 0
+  } = profile;
 
-  const bmr = calculateBmr({ gender, age, heightCm, weightKg, bodyFatPct });
-  const tdee = Math.round(bmr * activityMultiplier);
+  const formulaBmr = calculateBmr({ gender, age, heightCm, weightKg, bodyFatPct });
+  const formulaTdee = Math.round(formulaBmr * activityMultiplier);
+
+  // 套用實測代謝校正值 (Metabolic Calibration Offset) 與額外日常運動消耗
+  const offset = Math.round(Number(metabolicOffsetKcal) || 0);
+  const exerciseBonus = Math.round(Number(dailyExerciseKcal) || 0);
+  const bmr = Math.max(850, Math.round(formulaBmr + offset * 0.65));
+  const tdee = Math.max(1050, formulaTdee + offset + exerciseBonus);
 
   // 依據飲食法預設赤字比例與使用者選擇的強度計算目標熱量赤字
   const intensityMap = {
@@ -48,13 +64,13 @@ export function calculateWeightPlan(profile, method, durationWeeks, intensity = 
   const baseDeficitRatio = (method?.defaultDeficitRatio || 0.2) * intensityFactor;
   let desiredDeficit = Math.round(tdee * baseDeficitRatio);
 
-  // 限制合理每日赤字範圍 (300 ~ 900 kcal)
+  // 限制合理每日赤字範圍 (280 ~ 900 kcal)
   if (intensity === 'gentle') desiredDeficit = Math.max(280, Math.min(450, desiredDeficit));
   if (intensity === 'standard') desiredDeficit = Math.max(400, Math.min(680, desiredDeficit));
   if (intensity === 'aggressive') desiredDeficit = Math.max(550, Math.min(880, desiredDeficit));
 
-  // 安全熱量底線：不低於 BMR * 0.92，且女性不低於 1150 kcal、男性不低於 1400 kcal
-  const minSafeCalories = Math.max(gender === 'male' ? 1400 : 1150, Math.round(bmr * 0.92));
+  // 安全熱量底線：不低於 BMR * 0.92，且女性不低於 1100 kcal、男性不低於 1350 kcal
+  const minSafeCalories = Math.max(gender === 'male' ? 1350 : 1100, Math.round(bmr * 0.92));
   let targetCalories = tdee - desiredDeficit;
   let hitSafetyFloor = false;
 
@@ -63,8 +79,8 @@ export function calculateWeightPlan(profile, method, durationWeeks, intensity = 
     hitSafetyFloor = true;
   }
 
-  // 若 TDEE 本身偏低，確保至少有溫和赤字 220 kcal（搭配運動與斷食代謝加成）
-  const actualDailyDeficit = Math.max(220, tdee - targetCalories);
+  // 若 TDEE 本身偏低，確保至少有溫和赤字 200 kcal（搭配運動與斷食代謝加成）
+  const actualDailyDeficit = Math.max(200, tdee - targetCalories);
   const metabolicBonus = method?.metabolicBonus || 1.05;
   const effectiveDailyDeficit = Math.round(actualDailyDeficit * metabolicBonus);
 
@@ -137,11 +153,15 @@ export function calculateWeightPlan(profile, method, durationWeeks, intensity = 
     fatPct: Math.round(split.fat * 100)
   };
 
-  // 建議飲水量 (ml)：一般 35ml/kg，高蛋白或低碳 38ml/kg
+  // 建議飲水量 (ml)：一般 35ml/kg，高蛋白或低碳 38ml/kg，若有運動每消耗 100 kcal 補水 120ml
   const waterPerKg = ['highprotein', 'lowcarb', '186'].includes(method?.id) ? 38 : 35;
-  const dailyWaterMl = Math.round((weightKg * waterPerKg) / 50) * 50;
+  const dailyWaterMl = Math.round(((weightKg * waterPerKg) + exerciseBonus * 1.2) / 50) * 50;
 
   return {
+    formulaBmr,
+    formulaTdee,
+    metabolicOffsetKcal: offset,
+    dailyExerciseKcal: exerciseBonus,
     bmr,
     tdee,
     targetCalories,
@@ -160,6 +180,66 @@ export function calculateWeightPlan(profile, method, durationWeeks, intensity = 
     dailyWaterMl,
     macros,
     milestones
+  };
+}
+
+/**
+ * 🧠 智慧代謝能力動態校正 (Adaptive TDEE Calibration)
+ * 比對「預計減重變化（含運動消耗與飲食紀錄）」與「實際體重變化」，推算個人真實代謝偏差
+ */
+export function evaluateMetabolicCalibration({
+  days,
+  expectedChangeKg,
+  actualChangeKg,
+  avgExerciseKcal = 0,
+  formulaTdee = 1850
+}) {
+  const validDays = Math.max(3, Math.min(90, Number(days) || 7));
+  const expKg = Number(expectedChangeKg) || 0; // 例如預計瘦 1kg 則傳入 -1.0
+  const actKg = Number(actualChangeKg) || 0;   // 例如實際胖 0.5kg 則傳入 +0.5
+  const exKcal = Math.max(0, Number(avgExerciseKcal) || 0);
+
+  // 運動額外帶來的預期減重 (kg)
+  const exerciseExpectedLossKg = -((exKcal * validDays) / 7700);
+  const totalExpectedChangeKg = +(expKg + exerciseExpectedLossKg).toFixed(2);
+
+  // 體重落差 (正數代表實際比預期重＝瘦比較少或變胖；負數代表瘦得比預期更快)
+  const diffKg = +(actKg - totalExpectedChangeKg).toFixed(2);
+
+  // 換算成每日未解釋的熱量落差 (kcal/day)
+  // 若 diffKg > 0，代表實際消耗比預期少 (代謝偏慢或隱藏熱量)，因此代謝校正值應為負數
+  const rawDailyErrorKcal = -Math.round((diffKg * 7700) / validDays);
+
+  // 生理阻尼係數：短期 (如7天) 體重波動常含 50%~65% 水分/肝醣/運動後肌肉微發炎儲水，
+  // 因此依觀察天數給予平滑權重 (7天約 0.30, 14天約 0.44, 28天以上約 0.65)
+  const damping = Math.min(0.65, 0.16 + validDays * 0.02);
+  let recommendedOffsetKcal = Math.round(rawDailyErrorKcal * damping);
+
+  // 安全生理範圍限制 (-400 ~ +400 kcal/日)
+  recommendedOffsetKcal = Math.max(-400, Math.min(400, recommendedOffsetKcal));
+
+  const calibratedTdee = Math.max(1050, formulaTdee + recommendedOffsetKcal + exKcal);
+
+  let diagnosis = '';
+  if (Math.abs(diffKg) <= 0.25) {
+    diagnosis = `✅ 您的實際體重變化 (${actKg >= 0 ? '+' : ''}${actKg} kg) 與加計運動消耗後的預期 (${totalExpectedChangeKg} kg) 非常吻合！代表您目前的代謝估算非常精準。`;
+  } else if (diffKg > 0) {
+    diagnosis = `🔍 執行 ${validDays} 天後，加計每日運動消耗 ${exKcal} kcal 後原預計變化為 ${totalExpectedChangeKg} kg，但實際為 ${actKg >= 0 ? '+' : ''}${actKg} kg（相差 +${diffKg} kg）。這通常有約 60% 來自「外食高鈉儲水／運動後肌肉修復儲水」，約 40% 反映您的「真實基礎代謝較理論公式低約 ${Math.abs(recommendedOffsetKcal)} kcal/日」。建議套用下方代謝校正值，系統將自動下修您的真實 TDEE 並重新調整每日熱量目標！`;
+  } else {
+    diagnosis = `🔥 執行 ${validDays} 天後，您的實際減重進度 (${actKg} kg) 超前預期 (${totalExpectedChangeKg} kg) 達 ${Math.abs(diffKg)} kg！代表您的真實代謝能力或肌肉消耗高於公式預估（約 +${recommendedOffsetKcal} kcal/日），可套用校正適度提高飲食額度避免流失肌肉。`;
+  }
+
+  return {
+    validDays,
+    expectedChangeKg: expKg,
+    exerciseExpectedLossKg: +exerciseExpectedLossKg.toFixed(2),
+    totalExpectedChangeKg,
+    actualChangeKg: actKg,
+    diffKg,
+    rawDailyErrorKcal,
+    recommendedOffsetKcal,
+    calibratedTdee,
+    diagnosis
   };
 }
 

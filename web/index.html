@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
-  <link rel="stylesheet" href="css/app.css?v=1.1.5" />
+  <link rel="stylesheet" href="css/app.css?v=1.2.0" />
 </head>
 <body>
   <div id="loading" class="loading-overlay hidden">載入飲食資料庫中…</div>
@@ -22,7 +22,7 @@
       <div class="brand-row">
         <div class="brand-logo">🥗</div>
         <div>
-          <h1 class="brand-title">HealthyWeight <span id="header-version" class="brand-sub">v1.1.5</span></h1>
+          <h1 class="brand-title">HealthyWeight <span id="header-version" class="brand-sub">v1.2.0</span></h1>
         </div>
       </div>
 
@@ -221,6 +221,7 @@
         </div>
       </div>
 
+      <div id="res-calibration-notice" class="portion-advice-banner hidden" style="margin-bottom:16px"></div>
       <div id="res-safety-notice" class="safety-banner hidden"></div>
 
       <!-- 24小時斷食與進食時間軸卡片 -->
@@ -519,23 +520,28 @@
 
     <!-- ==================== 畫面 4：每日體重與飲食打卡追蹤 ==================== -->
     <section id="screen-tracker" class="screen hidden">
+      <!-- 卡片 A：每日體重、飲食與運動消耗打卡 -->
       <div class="card">
         <div class="card-title-row">
-          <h2 class="card-title">📊 每日體重與飲食執行打卡</h2>
+          <h2 class="card-title">📊 每日體重、飲食與運動消耗打卡</h2>
           <span class="pool-text" style="margin:0">資料自動保存在此裝置瀏覽器</span>
         </div>
 
-        <div class="form-grid-3">
+        <div class="form-grid-2">
           <div class="field-group">
-            <label class="field-label" for="log-date">日期</label>
+            <label class="field-label" for="log-date">📅 日期</label>
             <input type="date" id="log-date" class="text-input" />
           </div>
           <div class="field-group">
-            <label class="field-label" for="log-weight">當日體重 (kg)</label>
+            <label class="field-label" for="log-weight">⚖️ 當日體重 (kg)</label>
             <input type="number" id="log-weight" class="text-input" step="0.1" min="30" max="200" placeholder="例如 63.5" />
           </div>
           <div class="field-group">
-            <label class="field-label" for="log-status">飲食/斷食執行狀況</label>
+            <label class="field-label" for="log-exercise">🏃 當日運動額外消耗 (kcal) <span class="opt-tag">避免代謝估算偏差</span></label>
+            <input type="number" id="log-exercise" class="text-input" step="10" min="0" max="3000" value="0" placeholder="0" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="log-status">🍽️ 飲食/斷食執行狀況</label>
             <select id="log-status" class="select-input">
               <option value="✅ 完美達標">✅ 完美達標（完成斷食與控卡）</option>
               <option value="👍 大致達標">👍 大致達標（微幅超標但健康）</option>
@@ -544,16 +550,88 @@
           </div>
         </div>
 
+        <!-- 快速累加運動消耗卡路里按鈕 -->
+        <div class="preset-row" style="margin-top:8px;margin-bottom:10px">
+          <span class="pool-text" style="align-self:center;margin:0">⚡ 點擊累加運動消耗：</span>
+          <button type="button" class="preset-chip ex-quick-btn" data-kcal="130">🚶 快走30分 (+130)</button>
+          <button type="button" class="preset-chip ex-quick-btn" data-kcal="260">🏃 慢跑30分 (+260)</button>
+          <button type="button" class="preset-chip ex-quick-btn" data-kcal="220">🏋️ 重訓40分 (+220)</button>
+          <button type="button" class="preset-chip ex-quick-btn" data-kcal="240">🚴 單車/飛輪30分 (+240)</button>
+          <button type="button" class="preset-chip ex-quick-btn" data-kcal="0">🧹 歸零</button>
+        </div>
+
         <div class="field-group" style="margin-top:10px">
-          <label class="field-label" for="log-note">飲食備忘 / 今日吃了哪套菜單（選填）</label>
-          <input type="text" id="log-note" class="text-input" placeholder="例如：168超商套餐A、喝水 2500ml、快走30分鐘" />
+          <label class="field-label" for="log-note">📝 飲食與運動備忘（選填）</label>
+          <input type="text" id="log-note" class="text-input" placeholder="例如：168超商套餐A、慢跑30分鐘、喝水 2500ml" />
         </div>
 
         <button type="button" id="add-log-btn" class="btn-primary" style="width:100%;margin-top:12px">
-          ➕ 儲存今日體重與飲食紀錄
+          ➕ 儲存今日體重與運動飲食紀錄
         </button>
       </div>
 
+      <!-- 卡片 B：🧠 實測代謝能力動態校正 (Adaptive TDEE) -->
+      <div class="card calib-card">
+        <div class="card-title-row">
+          <div>
+            <h2 class="card-title">🧠 實測代謝能力動態校正 (Adaptive TDEE)</h2>
+            <p class="pool-text" style="margin:3px 0 0">執行一週後實際體重與預期不符？（例如預計瘦 1kg 卻胖 0.5kg）輸入實測結果與運動消耗，系統將自動重新校正您的真實基礎代謝與未來減重計畫！</p>
+          </div>
+          <button type="button" id="calib-autofill-btn" class="btn-secondary" style="font-size:0.82rem;padding:7px 12px">
+            📥 從打卡紀錄帶入
+          </button>
+        </div>
+
+        <div class="form-grid-2" style="margin-top:10px">
+          <div class="field-group">
+            <label class="field-label" for="calib-days">⏱️ 已執行天數 (天)</label>
+            <input type="number" id="calib-days" class="text-input" min="3" max="90" value="7" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="calib-avg-exercise">🏃 期間平均每日運動消耗 (kcal)</label>
+            <input type="number" id="calib-avg-exercise" class="text-input" min="0" max="2000" step="10" value="0" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="calib-expected-kg">📉 原預計體重變化 (kg) <span class="opt-tag">負數代表減重</span></label>
+            <input type="number" id="calib-expected-kg" class="text-input" step="0.1" value="-1.0" />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="calib-actual-kg">⚖️ 實際體重變化 (kg) <span class="opt-tag">例如胖0.5填 0.5、瘦0.8填 -0.8</span></label>
+            <input type="number" id="calib-actual-kg" class="text-input" step="0.1" value="0.5" />
+          </div>
+        </div>
+
+        <!-- 即時校正試算結果面板 -->
+        <div id="calib-result-box" class="calib-result-box">
+          <div class="calib-metrics-row">
+            <div>
+              <span class="pool-text">公式理論 TDEE</span>
+              <strong id="calib-formula-tdee" class="calib-num">1,856 kcal</strong>
+            </div>
+            <div class="calib-arrow">➔</div>
+            <div>
+              <span class="pool-text">實測校正後真實 TDEE</span>
+              <strong id="calib-new-tdee" class="calib-num highlight">1,540 kcal</strong>
+            </div>
+            <div>
+              <span class="pool-text">建議代謝能力修正值</span>
+              <strong id="calib-offset-val" class="calib-num">-316 kcal/日</strong>
+            </div>
+          </div>
+          <p id="calib-diagnosis-text" class="calib-diagnosis"></p>
+        </div>
+
+        <div class="btn-row" style="margin-top:12px">
+          <button type="button" id="calib-reset-btn" class="btn-secondary">
+            ↩️ 恢復預設公式代謝
+          </button>
+          <button type="button" id="calib-apply-btn" class="btn-primary">
+            🔄 套用校正代謝並重算減重計畫
+          </button>
+        </div>
+      </div>
+
+      <!-- 卡片 C：歷史打卡紀錄 -->
       <div class="card">
         <div class="card-title-row">
           <h2 class="card-title">🗂️ 歷史打卡紀錄</h2>
@@ -588,6 +666,6 @@
     </footer>
   </div>
 
-  <script type="module" src="js/app.js?v=1.1.5"></script>
+  <script type="module" src="js/app.js?v=1.2.0"></script>
 </body>
 </html>
